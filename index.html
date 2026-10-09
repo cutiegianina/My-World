@@ -80,8 +80,8 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
   #toasts{left:calc(62px + env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));transform:none;align-items:flex-start;width:min(300px,34vw)}
 }
 @keyframes tin{from{opacity:0;transform:translateY(-6px)}}
-#mysay{position:fixed;left:0;top:0;display:none;background:var(--paper);color:var(--ink);font:600 14px var(--display);padding:6px 12px;border-radius:14px;box-shadow:var(--shadow);max-width:240px;white-space:normal;text-align:center;overflow-wrap:anywhere;pointer-events:none;z-index:1}
-#mysay::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--paper);border-bottom-width:0}
+#mysay,.rsay{position:fixed;left:0;top:0;display:none;background:var(--paper);color:var(--ink);font:600 14px var(--display);padding:6px 12px;border-radius:14px;box-shadow:var(--shadow);max-width:240px;white-space:normal;text-align:center;overflow-wrap:anywhere;pointer-events:none;z-index:1}
+#mysay::after,.rsay::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--paper);border-bottom-width:0}
 /* login gate (hosted version): a dusk view of the world's own skyline, then a quiet card */
 #gate{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;overflow:hidden;user-select:none;-webkit-user-select:none;
   background:linear-gradient(180deg,#25406f 0%,#5d68a5 28%,#d98f95 56%,#ffc98a 80%,#ffe6b4 100%);transition:opacity .6s ease}
@@ -2138,7 +2138,20 @@ function makeCloudAdapter(cfg,prepare,fallback){
       ch.subscribe(st=>{rok=st==='SUBSCRIBED';if(rok){ch.track({n:who()});setTimeout(()=>{rlive=true},1500)}else if(st==='CLOSED'||st==='CHANNEL_ERROR'||st==='TIMED_OUT')rlive=false});
       return true},
     async close(){const c=ch;ch=null;rok=rlive=false;if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}}};
-  return{auth,ready,room:rm,
+  /* the shared world: a second Realtime channel. Broadcast 'p' carries positions (not acknowledged, nothing stored); presence carries who is on which bike / seat. */
+  let wch=null,wkey='',wok=false;const wh={};const wfire=(t,a)=>(wh[t]||[]).forEach(f=>{try{f(a)}catch(_){}});
+  const world={connected:()=>wok,key:()=>wkey,on:(t,f)=>{(wh[t]||(wh[t]=[])).push(f)},
+    send(t,data){if(wch&&wok){try{Promise.resolve(wch.send({type:'broadcast',event:t,payload:data})).catch(()=>{})}catch(_){}}},
+    track(st){if(wch&&wok){try{Promise.resolve(wch.track(st)).catch(()=>{})}catch(_){}}},
+    async open(){await ready;if(fail||!sb||!user||wch)return !!wch;wkey=user.id+':'+Math.random().toString(36).slice(2,7);   // (a second tab of yours is a second character)
+      wch=sb.channel(cfg.room+'-world',{config:{broadcast:{self:false,ack:false},presence:{key:wkey}}});
+      wch.on('broadcast',{event:'p'},m=>wfire('p',m&&m.payload));
+      wch.on('presence',{event:'sync'},()=>wfire('sync',wch?wch.presenceState():{}));
+      wch.on('presence',{event:'join'},e=>{if(e&&e.key!==wkey)wfire('join',e.key)});
+      wch.subscribe(st=>{const ok=st==='SUBSCRIBED';if(ok!==wok){wok=ok;wfire('status',ok)}});
+      return true},
+    async close(){const c=wch;wch=null;if(wok){wok=false;wfire('status',false)}if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}}};
+  return{auth,ready,room:rm,world,
     async put(file,meta){const c=await need();if(!c)return fallback.put(file,meta);
       const p=await prepare(file),id=uid(),base=user.id+'/'+id,tp=p.thumb?base+'.thumb':null,up=[];
       try{
@@ -2229,7 +2242,7 @@ function sendChat(){const t=clean(chatIn.value).slice(0,80);if(!t||!room)return;
   if(performance.now()-lastSend<1200)return;
   if(!room.connected()){toast('','Not connected yet - try again in a moment',true);return}
   lastSend=performance.now();chatIn.value='';
-  room.emit('chat',{n:clean(PPL[ctl].name).slice(0,16),t}).then(()=>{mySay.textContent=t;mySayUntil=performance.now()+4500},
+  room.emit('chat',{n:clean(PPL[ctl].name).slice(0,16),t,u:MP.key()}).then(()=>{mySay.textContent=t;mySayUntil=performance.now()+4500},
     e=>toast('',e&&e.code==='not_permitted'?'Viewers can\'t send messages here':'Message didn\'t go through',true));
   closeChat()}
 $('bchat').onclick=()=>chatEl.style.display==='flex'?closeChat():openChat();
@@ -2238,7 +2251,7 @@ $('chatgo').onclick=sendChat;$('chatx').onclick=closeChat;
 chatIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape')closeChat()});
 let roomHooked=null;
 function useRoom(r){room=r;$('bchat').hidden=false;if(roomHooked===r)return;roomHooked=r;
-  r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;toast(clean(d.n).slice(0,16)||'Someone',t)});
+  r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;if(typeof d.u==='string')MP.say(d.u,t);toast(clean(d.n).slice(0,16)||'Someone',t)});
   r.on('join',n=>toast('',(clean(n).slice(0,16)||'Someone')+' joined',true))}
 // on claude.ai the room is built in; on the hosted version it is a Realtime channel, open only while signed in
 try{if(window.claude&&claude.use)claude.use('room').then(r=>{if(r)useRoom(r)}).catch(()=>{})}catch(_){}
@@ -2593,6 +2606,7 @@ function drawMap(){const S=mapCv.width,u=S/280;let vs,vx0,vz0;
   if(coordOn&&pin){mg.fillStyle='#ff2d55';mg.beginPath();mg.arc(X(pin.x),Z(pin.z),5*u,0,7);mg.fill()}
   const q=fr.root.position;mg.fillStyle='#ff6fa8';mg.strokeStyle='#fff';mg.lineWidth=2.5*u;mg.beginPath();mg.arc(clamp(X(q.x),6*u,S-6*u),clamp(Z(q.z),6*u,S-6*u),6*u,0,7);mg.fill();mg.stroke();   // the friend
   mg.fillStyle='#e7a84e';mg.lineWidth=2*u;mg.beginPath();mg.arc(clamp(X(DOG.x),5*u,S-5*u),clamp(Z(DOG.z),5*u,S-5*u),4.3*u,0,7);mg.fill();mg.stroke();   // Awaw
+  mg.fillStyle='#3aa7e8';mg.strokeStyle='#fff';mg.lineWidth=2*u;MP.each(R=>{mg.beginPath();mg.arc(clamp(X(R.x),5*u,S-5*u),clamp(Z(R.z),5*u,S-5*u),4.6*u,0,7);mg.fill();mg.stroke()});   // other people
   mg.save();mg.translate(X(P.position.x),Z(P.position.z));mg.rotate(Math.PI/2-P.rotation.y);mg.scale(u,u);
   mg.fillStyle='#ff7a3d';mg.strokeStyle='#fff';mg.lineWidth=3;mg.beginPath();mg.moveTo(14,0);mg.lineTo(-10,10);mg.lineTo(-10,-10);mg.closePath();mg.fill();mg.stroke();mg.restore()}
 mapSize();
@@ -2773,6 +2787,115 @@ function dogAnim(dt){const D=DOG,d=dog,gal=sstep(6,9.5,D.v);
   const bl=D.blink<0?(D.blink<-.12?(D.blink=2.5+Math.random()*3,1):.1):1;d.eyes.forEach(e=>e.scale.y=Math.min(bl,1-D.sleep*.9));
   d.tongue.visible=D.pant>.15;d.tongue.scale.y=.018*(1+Math.sin(t*14)*.25)}
 
+/*MP-BEGIN*/
+/* =========================== OTHER PEOPLE: everyone signed in shares one world ===========================
+   Every browser runs its own copy of the world; only small facts travel: where you are (about 4 times a second while you move,
+   once every few seconds while you stand still) and who is on which bike / seat. The friend and Awaw are never sent: they stay yours alone.
+   Two Realtime messages kinds: broadcast 'p' = position, and presence = outfit, name, bike, seat, parked bikes. Nothing is stored anywhere. */
+const MP=(()=>{
+const WS=storage.world,none={key:()=>'',say(){},tick(){},tags(){},each(){},bike(){}};
+if(!WS||!storage.auth)return none;
+const MAXR=24,remotes=new Map(),pool=[],tagBox=tagN.parentNode,before=(a,ka,b,kb)=>a<b||(a===b&&ka<kb);
+const my={b:-1,bt:0,s:null,st:0,pk:{}};let myKey='',on=false,acc=0,lastSend=0,lastTrack=0,trackDue=false,dueMin=500,lastSig='',lp={x:P.position.x,z:P.position.z},sent={m:-1,r:0};
+PARKED.forEach(b=>{if(!b.home)b.home={x:b.g.position.x,y:b.g.position.y,z:b.g.position.z,ry:b.g.rotation.y}});   // where each bike lives at the rack
+const num=(v,lo,hi)=>{v=+v;return isFinite(v)&&v>=lo&&v<=hi?v:null};
+
+/* ---- the other people ---- */
+function addRemote(key){if(remotes.size>=MAXR)return null;const rig=pool.pop()||makePerson();rig.root.visible=false;rig.bikes=rig.bikes||[];
+  const tag=document.createElement('div');tag.className='tag';tagBox.appendChild(tag);const say=document.createElement('div');say.className='rsay';tagBox.appendChild(say);
+  const R={key,rig,tag,say,sayUntil:0,has:false,x:0,z:0,tx:0,tz:0,vx:0,vz:0,r:0,tr:0,m:0,lastP:0,amt:0,ph:0,b:-1,bt:0,s:null,st:0,pk:{},curBike:-1,pose:'walk',outfit:-1,look:''};
+  remotes.set(key,R);return R}
+function showBike(R,i){const g=R.rig.bikes;if(R.curBike===i)return;if(R.curBike>=0&&g[R.curBike])g[R.curBike].g.visible=false;R.curBike=i;
+  if(i>=0){let b=g[i];if(!b){b=g[i]=makeBike(BIKECOL[i]);R.rig.root.add(b.g)}b.g.visible=true}}
+function dropRemote(R){R.rig.root.visible=false;showBike(R,-1);standPose(R.rig);R.tag.remove();R.say.remove();pool.push(R.rig);remotes.delete(R.key)}
+
+/* presence changed: who is here, what they look like, which bike / seat they hold */
+function onSync(st){const seen=new Set();
+  for(const k in st){if(k===myKey)continue;const arr=st[k],e=arr&&arr[arr.length-1];if(!e||typeof e!=='object')continue;
+    const R=remotes.get(k)||addRemote(k);if(!R)continue;seen.add(k);
+    R.tag.textContent=clean(e.n).slice(0,16)||'Someone';
+    const o=clamp(e.o|0,0,OUT.length-1),lk=e.l==='her'?'her':'him';if(o!==R.outfit||lk!==R.look){R.outfit=o;R.look=lk;dress(R.rig,{outfit:o,look:lk})}
+    R.b=Number.isInteger(e.b)&&e.b>=0&&e.b<PARKED.length?e.b:-1;R.bt=+e.bt||0;
+    R.s=Number.isInteger(e.s)&&e.s>=-1&&e.s<SEATS.length?e.s:null;R.st=+e.st||0;
+    R.pk={};if(e.pk&&typeof e.pk==='object')for(const i in e.pk){const q=e.pk[i];if(Array.isArray(q)&&q.length>=5&&q.slice(0,5).every(Number.isFinite)&&i>=0&&i<PARKED.length)R.pk[i]=q.slice(0,5)}}
+  remotes.forEach(R=>{if(!seen.has(R.key))dropRemote(R)});
+  reconcile()}
+
+/* who holds what. If two people grabbed the same bike or seat at the same moment, the earlier claim wins and the other gets up. */
+function reconcile(){
+  const claim=new Map();remotes.forEach(R=>{if(R.s!=null&&R.s>=0)claim.set(R.s,R)});
+  SEATS.forEach((s,i)=>{const R=claim.get(i);
+    if(R){let mine=sitting===s;
+      if(mine){if(before(R.st,R.key,my.st,myKey)){standUp();mine=false;toast('','Someone sat there first',true)}}
+      if(!mine){if(FR.seat===s)frUnseat();s.who='r:'+R.key}}
+    else if(typeof s.who==='string'&&s.who.startsWith('r:'))s.who=null});
+  if(riding){let R=null;remotes.forEach(q=>{if(q.b===bikeIdx)R=q});if(R&&before(R.bt,R.key,my.bt,myKey)){toggleBike();toast('','Someone got that bike first',true)}}
+  applyBikes()}
+/* each bike is: hidden while somebody rides it; otherwise wherever it was parked last (the most recent parking, by anyone, wins); otherwise in its slot */
+function applyBikes(){PARKED.forEach((b,i)=>{if(riding&&bikeIdx===i)return;
+  let busy=false;remotes.forEach(R=>{if(R.b===i)busy=true});if(busy){b.g.visible=false;return}
+  let best=my.pk[i]||null;remotes.forEach(R=>{const q=R.pk[i];if(q&&(!best||q[3]>best[3]))best=q});
+  const h=b.home;if(best){b.g.position.set(best[0],best[4],best[1]);b.g.rotation.y=best[2]}else{b.g.position.set(h.x,h.y,h.z);b.g.rotation.y=h.ry}
+  b.g.visible=true})}
+// you mount or hop off a bike: tell everybody
+const toggleBike0=toggleBike;
+toggleBike=function(){const was=riding;toggleBike0();if(was!==riding)bikeChanged()};
+function bikeChanged(){const now=Date.now();
+  if(riding){my.b=bikeIdx;my.bt=now;delete my.pk[bikeIdx]}
+  else{const g=PARKED[bikeIdx].g.position;my.pk[bikeIdx]=[+g.x.toFixed(2),+g.z.toFixed(2),+PARKED[bikeIdx].g.rotation.y.toFixed(3),now,+g.y.toFixed(2)];my.b=-1}
+  pushState(true);applyBikes()}
+
+/* ---- telling the others about me ---- */
+const seatNow=()=>!sitting?null:sitting.kind==='ground'&&!SEATS.includes(sitting)?-1:SEATS.indexOf(sitting);
+function pushState(force){const now=performance.now();if(!on)return;
+  const gap=force?120:500;if(now-lastTrack<gap){dueMin=trackDue?Math.min(dueMin,gap):gap;trackDue=true;return}
+  lastTrack=now;trackDue=false;dueMin=500;const p=PPL[ctl];WS.track({n:clean(p.name).slice(0,16)||'Someone',o:p.outfit|0,l:p.look==='her'?'her':'him',b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
+function sendPos(force,mv){const now=performance.now();lastSend=now;sent.m=mv;sent.r=P.rotation.y;
+  WS.send('p',{k:myKey,x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+P.rotation.y.toFixed(2),m:mv})}
+WS.on('p',d=>{if(!d||typeof d.k!=='string'||d.k===myKey)return;const R=remotes.get(d.k);if(!R)return;
+  const x=num(d.x,-2000,2000),z=num(d.z,-2000,2000),r=num(d.r,-20,20);if(x==null||z==null||r==null)return;
+  const now=performance.now(),mv=d.m?1:0;
+  if(!R.has){R.has=true;R.x=R.tx=x;R.z=R.tz=z;R.r=r;R.vx=R.vz=0;R.rig.root.visible=true}
+  else{const dt=(now-R.lastP)/1000;if(mv&&dt>.05&&dt<1.5){R.vx=(x-R.tx)/dt;R.vz=(z-R.tz)/dt}else R.vx=R.vz=0}
+  R.tx=x;R.tz=z;R.tr=r;R.m=mv;R.lastP=now});
+WS.on('sync',onSync);
+WS.on('join',()=>{if(on)sendPos(true,sent.m<0?0:sent.m)});   // somebody new: say where I am straight away
+WS.on('status',ok=>{
+  if(ok){myKey=WS.key();on=true;my.s=seatNow();my.st=my.st||Date.now();lastSig='';pushState(true);sendPos(true,0);[700,1800].forEach(ms=>setTimeout(()=>{if(on)sendPos(true,sent.m<0?0:sent.m)},ms))}
+  else{on=false;remotes.forEach(dropRemote);reconcile()}});
+const sync=async()=>{if(storage.auth.user()){try{await WS.open()}catch(_){}}else{try{await WS.close()}catch(_){}}};
+storage.ready.then(sync);storage.auth.onChange(()=>{sync()});
+
+/* ---- every frame ---- */
+const sOf=R=>R.s!=null?(R.s>=0?SEATS[R.s]:{kind:'ground'}):null;
+function tick(dt,t){
+  if(on){
+    const sn=seatNow();if(sn!==my.s){my.s=sn;my.st=Date.now()}
+    const p=PPL[ctl],sig=clean(p.name)+'|'+p.outfit+'|'+p.look+'|'+my.s+'|'+my.b;
+    if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
+    acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
+      if(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>3000)sendPos(false,mv)}}
+  const now=performance.now();
+  remotes.forEach(R=>{if(!R.has)return;const g=R.rig,root=g.root,seat=sOf(R),ride=!seat&&R.b>=0;
+    // where: smoothly toward the last known place (a little ahead of it while they are moving)
+    const e=R.m?Math.min((now-R.lastP)/1000,.4):0,px=R.tx+R.vx*e,pz=R.tz+R.vz*e,k=1-Math.exp(-dt*10),ox=R.x,oz=R.z;
+    if(Math.hypot(px-R.x,pz-R.z)>25){R.x=px;R.z=pz}else{R.x+=(px-R.x)*k;R.z+=(pz-R.z)*k}
+    let dr=R.tr-R.r;dr=Math.atan2(Math.sin(dr),Math.cos(dr));R.r+=dr*Math.min(1,dt*12);
+    const pose=seat?'sit':ride?'ride':'walk';if(pose!==R.pose){if(R.pose==='sit'||R.pose==='ride')standPose(g);R.pose=pose}
+    showBike(R,ride?R.b:-1);
+    R.amt+=((R.m&&!seat?1:0)-R.amt)*Math.min(1,dt*10);R.ph+=dt*(ride?7.5:11)*R.amt;
+    if(seat){const S=seat.sw,x=S?S.x:seat.x==null?R.x:seat.x,z=S?S.z:seat.z==null?R.z:seat.z;root.position.set(x,groundY(x,z),z);root.rotation.y=seat.face==null?R.r:seat.face;sitPose(g,seat)}
+    else{root.position.set(R.x,groundY(R.x,R.z)+(ride?0:Math.abs(Math.sin(R.ph))*.1*R.amt),R.z);root.rotation.y=R.r;
+      if(ride){const pd=Math.sin(R.ph)*.5*R.amt,b=g.bikes[R.curBike];g.legs[0].rotation.x=-1.05+pd;g.legs[1].rotation.x=-1.05-pd;g.arms[0].rotation.x=g.arms[1].rotation.x=-1.0;g.body.position.set(0,.46,-.38);g.body.rotation.set(.28,0,0);
+        if(b){b.crank.rotation.x=R.ph;const mvd=Math.hypot(R.x-ox,R.z-oz);b.wheels.forEach(w=>w.rotation.x+=mvd/.62)}}
+      else{const sw=Math.sin(R.ph)*R.amt;g.legs[0].rotation.x=sw*.65;g.legs[1].rotation.x=-sw*.65;g.arms[0].rotation.x=-sw*.55;g.arms[1].rotation.x=sw*.55;g.torso.scale.y=1+Math.sin(t*2.2)*.012*(1-R.amt)}}
+    blinkTick(g,dt)})}
+function tags(){remotes.forEach(R=>{const q=R.rig.root.position;
+  if(R.has&&!open)tagAt(R.tag,q.x,q.y,q.z,8,70);else R.tag.style.display='none';
+  if(R.has&&!open&&R.sayUntil>performance.now())tagAt(R.say,q.x,q.y+4.4,q.z,-8,70,true);else if(R.say.style.display!=='none')R.say.style.display='none'})}
+return{key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){R.say.textContent=text;R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
+/*MP-END*/
+
 const clockT=new THREE.Clock();let t=0,walkPh=0,walkAmt=0,frames=0,lift=0,lastStep=0;
 function frame(){
   const dt=Math.min(clockT.getDelta(),.05);t+=dt;U.time.value=t;
@@ -2802,7 +2925,7 @@ function frame(){
   P.position.y=groundY(P.position.x,P.position.z)+(riding?0:Math.abs(Math.sin(walkPh))*.1*walkAmt);
   if(sitting&&sitting.sw){const S=sitting.sw;P.position.x=S.x;P.position.z=S.z;P.position.y=groundY(S.x,S.z);P.rotation.y=sitting.face}   // riding the swing
   if(sitting)sitPose(me,sitting);
-  frTick(dt);dogTick(dt);blinkTick(me,dt);blinkTick(fr,dt);
+  frTick(dt);dogTick(dt);blinkTick(me,dt);blinkTick(fr,dt);MP.tick(dt,t);
   // places
   near=SPOTS.find(s=>Math.hypot(s.x-P.position.x,s.z-P.position.z)<4.5)||null;
   const nsl=near||sitting||riding?null:nearSeat();
@@ -2838,7 +2961,7 @@ function frame(){
   {const a=flagGeo.attributes.position;for(let i=0;i<a.count;i++){const x=FLAG0[i*3];a.setZ(i,Math.sin(t*7-x*3.2)*.16*x+Math.sin(t*11-x*5)*.04*x);a.setY(i,FLAG0[i*3+1]-x*x*.03)}a.needsUpdate=true;flagGeo.computeVertexNormals()}
   MARKS.forEach((m,i)=>{m.gem.position.y=m.core.position.y=m.y+Math.sin(t*2+i*2)*.25;m.gem.rotation.y=t*1.2+i;m.core.rotation.y=-t*.8+i;m.beam.material.opacity=.13+.05*Math.sin(t*2.4+i)});
   SIGNS.forEach((s,i)=>{s.sp.position.y=s.y+Math.sin(t*1.6+i)*.12;s.sp.material.opacity=sstep(9,17,cam.position.distanceTo(s.sp.position))});
-  tagsTick(dt);
+  tagsTick(dt);MP.tags();
   if((frames++&1)===0)drawMap();
   composer.render();
   if(frames===2)$('loading').classList.add('done');
