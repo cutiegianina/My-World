@@ -2859,7 +2859,7 @@ WS.on('p',d=>{if(!d||typeof d.k!=='string'||d.k===myKey)return;const R=remotes.g
   else{const dt=(now-R.lastP)/1000;if(mv&&dt>.05&&dt<1.5){R.vx=(x-R.tx)/dt;R.vz=(z-R.tz)/dt}else R.vx=R.vz=0}
   R.tx=x;R.tz=z;R.tr=r;R.m=mv;R.lastP=now});
 WS.on('sync',onSync);
-WS.on('join',()=>{if(on)sendPos(true,sent.m<0?0:sent.m)});   // somebody new: say where I am straight away
+WS.on('join',()=>{if(on)sendPos(true,sent.m<0?0:sent.m)});   // (sent.m: the last known motion)   // somebody new: say where I am straight away
 WS.on('status',ok=>{
   if(ok){myKey=WS.key();on=true;my.s=seatNow();my.st=my.st||Date.now();lastSig='';pushState(true);sendPos(true,0);[700,1800].forEach(ms=>setTimeout(()=>{if(on)sendPos(true,sent.m<0?0:sent.m)},ms))}
   else{on=false;remotes.forEach(dropRemote);reconcile()}});
@@ -2874,7 +2874,7 @@ function tick(dt,t){
     const p=PPL[ctl],sig=clean(p.name)+'|'+p.outfit+'|'+p.look+'|'+my.s+'|'+my.b;
     if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
     acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
-      if(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>3000)sendPos(false,mv)}}
+      if(remotes.size&&(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>3000))sendPos(false,mv)}}   // alone in the world: nothing is sent at all
   const now=performance.now();
   remotes.forEach(R=>{if(!R.has)return;const g=R.rig,root=g.root,seat=sOf(R),ride=!seat&&R.b>=0;
     // where: smoothly toward the last known place (a little ahead of it while they are moving)
