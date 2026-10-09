@@ -125,7 +125,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #mact{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:2}
 .ma{border:0;border-radius:999px;background:rgba(255,250,240,.92);color:#2b2a30;font:600 13px var(--body);padding:8px 13px;min-height:38px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .ma:disabled{opacity:.6;cursor:default}
-#macc[hidden]{display:none}
+#macc[hidden],#bout[hidden]{display:none}
 #mmsg{position:absolute;top:8px;left:8px;max-width:calc(100% - 200px);display:none;background:rgba(43,42,48,.88);color:#fff;font:600 12.5px/1.3 var(--body);padding:7px 11px;border-radius:12px;z-index:2}
 #mmsg.err{background:#b3382c}
 #media{width:100%;height:100%;display:flex}
@@ -185,6 +185,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
   <button class="round" id="bg" title="Stargaze: look up at the sky (tap again to come back)" aria-label="Stargaze">🔭</button>
   <button class="round" id="bx" title="Coordinates: shows where you are, tap the ground to drop a pin" aria-label="Coordinates">📍</button>
   <button class="round txt" id="bh" aria-label="Graphics quality">HD</button>
+  <button class="round" id="bout" title="Sign out" aria-label="Sign out" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <div id="clk"></div>
 </div>
 <div id="vol" role="group" aria-label="Volume"><button type="button" class="round" id="vmute" aria-label="Mute">🔊</button><input id="vsl" type="range" min="0" max="100" step="5" value="85" aria-label="Volume"><span id="vpc">85%</span></div>
@@ -2187,11 +2188,16 @@ function applyRec(it,r){if(!('m0' in it))it.m0=it.media;it.media=r?r.url:it.m0;i
 function refreshItem(i){const it=cur.items[i],b=$('thumbs').children[i];if(b)b.replaceChild(medEl(it,true),b.firstChild);if(i===ci)pick(ci)}
 function updActions(){if(!cur)return;const it=cur.items[ci],A=storage.auth,cloud=!!(A&&A.available()),u=cloud&&A.user(),can=!cloud||!!u;
   madd.textContent=it.mid?'🔄 Replace':'📷 Add photo/video';madd.style.display=can?'':'none';mdel.style.display=can&&it.mid?'':'none';madd.disabled=mdel.disabled=macc.disabled=mbusy;
-  macc.hidden=!cloud;if(cloud){macc.textContent=u?'👤 Sign out':'🔑 Sign in with Google';macc.title=u?'Signed in as '+(u.name?u.name+' · ':'')+u.email:'Sign in to keep your own photos and videos'}}
+  macc.hidden=!cloud||!!u;if(cloud&&!u){macc.textContent='🔑 Sign in with Google';macc.title='Sign in to keep your own photos and videos'}}   // signing out lives in the 🚪 button on the side now
 function hydrate(s){msg('');storage.ready.then(()=>{const A=storage.auth;
   if(A&&A.available()&&!A.user()){updActions();msg('Sign in with Google to see and add your own photos and videos');return}
   let warned=false;s.items.forEach((it,i)=>{storage.list(mkey(s,i)).then(rs=>{if(rs[0]){applyRec(it,rs[0]);if(cur===s)refreshItem(i)}}).catch(e=>{if(!warned&&cur===s){warned=true;msg(e&&e.message||'Saved photos are not available here',true)}})})})}
-macc.onclick=()=>{const A=storage.auth;if(!A||mbusy)return;(A.user()?A.signOut():A.signIn()).catch(e=>msg(e&&e.message||'Sign-in failed',true))};
+macc.onclick=()=>{const A=storage.auth;if(!A||mbusy||A.user())return;A.signIn().catch(e=>msg(e&&e.message||'Sign-in failed',true))};
+// sign out: a button in the side column, there only while signed in
+const bout=$('bout');
+function outSync(){const A=storage.auth,u=A&&A.available()&&A.user();bout.hidden=!u;if(u)bout.title='Sign out · '+(u.name?u.name+' · ':'')+u.email}
+bout.onclick=()=>{const A=storage.auth;if(!A||!A.user())return;if(confirm('Sign out of '+APP.name+'?'))A.signOut().catch(e=>toast('','Couldn\'t sign out - try again',true))};
+if(storage.auth){outSync();storage.ready.then(outSync);storage.auth.onChange(outSync)}
 if(storage.auth)storage.auth.onChange(()=>{SPOTS.forEach(sp=>sp.items.forEach(it=>applyRec(it,null)));if(cur){cur.items.forEach((_,i)=>refreshItem(i));hydrate(cur)}});   // someone signed in or out: show only their own media
 /* ---- login gate: on the hosted version the world opens only after Google sign-in ---- */
 const gate=$('gate'),gbtn=$('gbtn'),gstat=$('gstat'),gmsg=$('gmsg'),gskip=$('gskip');let gateOn=false,gateSkipped=false,gateMode='';
@@ -2874,7 +2880,7 @@ function tick(dt,t){
     const p=PPL[ctl],sig=clean(p.name)+'|'+p.outfit+'|'+p.look+'|'+my.s+'|'+my.b;
     if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
     acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
-      if(remotes.size&&(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>3000))sendPos(false,mv)}}   // alone in the world: nothing is sent at all
+      if(remotes.size&&(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>20000))sendPos(false,mv)}}   // alone in the world: nothing is sent at all
   const now=performance.now();
   remotes.forEach(R=>{if(!R.has)return;const g=R.rig,root=g.root,seat=sOf(R),ride=!seat&&R.b>=0;
     // where: smoothly toward the last known place (a little ahead of it while they are moving)
