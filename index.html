@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Richard&#39;s World</title>
+<title>Tambayan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@500;700;800&display=swap">
@@ -59,8 +59,8 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #who{font:600 14px var(--display);white-space:nowrap}
 #swap{border:0;border-radius:999px;background:var(--paper-2);padding:6px 10px;font:700 12px var(--body);color:var(--ink);cursor:pointer;white-space:nowrap}
 #oflist{display:flex;flex-direction:column;gap:2px}
-#fnl{display:flex;flex-direction:column;gap:4px;padding:8px 6px 4px;margin-top:4px;border-top:2px solid var(--paper-2);font:700 12px var(--body);color:var(--ink-soft)}
-#fname{font:600 15px var(--display);border:2px solid var(--paper-2);border-radius:9px;padding:6px 8px;color:var(--ink);background:#fff;min-width:0;width:100%;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+#mnl,#fnl{display:flex;flex-direction:column;gap:4px;padding:8px 6px 4px;margin-top:4px;border-top:2px solid var(--paper-2);font:700 12px var(--body);color:var(--ink-soft)}
+#myname,#fname{font:600 15px var(--display);border:2px solid var(--paper-2);border-radius:9px;padding:6px 8px;color:var(--ink);background:#fff;min-width:0;width:100%;box-sizing:border-box;-webkit-user-select:text;user-select:text}
 .of{display:flex;align-items:center;gap:8px;border:2px solid transparent;border-radius:9px;background:none;padding:6px 10px;cursor:pointer;font:700 14px var(--body);color:var(--ink)}
 .of.on{border-color:var(--sun)}
 .of i{width:18px;height:18px;border-radius:50%;display:inline-block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
@@ -170,7 +170,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){#loading,#hud{transition:none}}
 </style>
 
-<div id="loading"><div><b>My World</b><span id="loadmsg">Planting the trees…</span></div></div>
+<div id="loading"><div><b>Tambayan</b><span id="loadmsg">Planting the trees…</span></div></div>
 <div id="hud"></div>
 <button id="prompt" type="button"></button>
 <div id="tools">
@@ -194,6 +194,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 <div id="coords" title="Tap to copy"></div>
 <div id="lap" role="status" aria-live="polite"></div>
 <div id="outfits"><div id="ohd"><b id="who"></b><button type="button" id="swap"></button></div><div id="oflist"></div>
+  <label id="mnl">Your name<input id="myname" maxlength="16" autocomplete="off" spellcheck="false"></label>
   <label id="fnl">Friend's name<input id="fname" maxlength="16" autocomplete="off" spellcheck="false"></label></div>
 <div id="tagP" class="tag"></div><div id="tagN" class="tag tagn" title="Tap to rename"></div><div id="tagD" class="tag"></div><div id="say"></div><div id="mysay"></div>
 <div id="toasts" role="status" aria-live="polite"></div>
@@ -221,7 +222,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 </svg>
 <div id="gcard">
  <div id="gpin"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="#f39a3c" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg></div>
- <h1 id="gtitle">Richard's World</h1>
+ <h1 id="gtitle">Tambayan</h1>
  <p>Sign in to walk around, and to keep your own photos and videos.</p>
  <button type="button" id="gbtn" hidden><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.5-4.7 7.2l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.6z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg><span id="gbtxt">Continue with Google</span></button>
  <div id="gstat" role="status"><i></i><span>Checking your sign-in…</span></div>
@@ -279,7 +280,8 @@ const SPOTS=[
   {title:'Golden Hour',place:'Beach name, Region',date:'2026',caption:''}]}
 ];
 // the two people: you, and a friend who wanders the trails (always the other gender). Visitors can rename the friend; it is remembered per browser.
-const ME={name:'Richard',look:'him'},FRIEND={name:'Friend',look:'her'};
+const ME={name:'Explorer',look:'him'},FRIEND={name:'Friend',look:'her'};   // ME.name is only the fallback: signed in, it becomes your Google first name (or whatever you rename yourself to)
+const APP={name:'Tambayan',short:'Tambayan'};   // the app's name: page title, login screen, loading screen, Home Screen icon
 // latitude for the night sky: a good-enough guess from the visitor's time zone (no location permission needed); Manila if unknown
 const TZLAT={'Asia/Manila':14.6,'Asia/Singapore':1.3,'Asia/Kuala_Lumpur':3.1,'Asia/Jakarta':-6.2,'Asia/Bangkok':13.8,'Asia/Ho_Chi_Minh':10.8,'Asia/Saigon':10.8,'Asia/Hong_Kong':22.3,'Asia/Shanghai':31.2,'Asia/Taipei':25,'Asia/Seoul':37.6,'Asia/Tokyo':35.7,'Asia/Kolkata':23,'Asia/Calcutta':23,'Asia/Dhaka':23.8,'Asia/Karachi':24.9,'Asia/Dubai':25.2,'Asia/Riyadh':24.7,'Asia/Tehran':35.7,'Asia/Jerusalem':31.8,
  'Europe/London':51.5,'Europe/Dublin':53.3,'Europe/Paris':48.9,'Europe/Berlin':52.5,'Europe/Madrid':40.4,'Europe/Rome':41.9,'Europe/Amsterdam':52.4,'Europe/Stockholm':59.3,'Europe/Athens':38,'Europe/Istanbul':41,'Europe/Moscow':55.8,'Europe/Kyiv':50.4,'Europe/Warsaw':52.2,'Europe/Lisbon':38.7,
@@ -290,6 +292,7 @@ let LAT=15;try{const z=Intl.DateTimeFormat().resolvedOptions().timeZone;if(z in 
 
 const $=id=>document.getElementById(id);
 const TEX=window.TEX;
+document.title=APP.name;$('gtitle').textContent=APP.name;{const lb=$('loading').querySelector('b');if(lb)lb.textContent=APP.name}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const sstep=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -1061,8 +1064,10 @@ const HOMEP={};   // where the little things are (for the coordinates panel)
   {const mx=Y.x1+1.3,mz=g0-.9,my=gy(mx,mz);put(M.dark,new THREE.BoxGeometry(.12,1.05,.12).translate(mx,my+.52,mz));
     put(M.red,new THREE.BoxGeometry(.44,.36,.72).translate(mx,my+1.2,mz));put(M.red,new THREE.CylinderGeometry(.22,.22,.72,12,1,false,0,Math.PI).rotateX(Math.PI/2).rotateZ(Math.PI/2).translate(mx,my+1.38,mz));
     put(M.iron,new THREE.BoxGeometry(.04,.34,.06).translate(mx-.25,my+1.42,mz+.2));put(M.red,new THREE.BoxGeometry(.04,.12,.2).translate(mx-.25,my+1.55,mz+.29));   // the little flag
-    const plate=new THREE.Mesh(new THREE.PlaneGeometry(.64,.2),new THREE.MeshStandardMaterial({map:canvasTex(256,80,(g,w,h)=>{g.fillStyle='#fbf7ee';g.fillRect(0,0,w,h);g.strokeStyle='#6e4a2f';g.lineWidth=5;g.strokeRect(3,3,w-6,h-6);
-      g.fillStyle='#3a2a1e';g.font='600 46px Fredoka, Nunito, system-ui, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(ME.name,w/2,h/2+3)}),roughness:.7}));
+    const plateDraw=(g,w,h)=>{g.clearRect(0,0,w,h);g.fillStyle='#fbf7ee';g.fillRect(0,0,w,h);g.strokeStyle='#6e4a2f';g.lineWidth=5;g.strokeRect(3,3,w-6,h-6);
+      g.fillStyle='#3a2a1e';g.font='600 46px Fredoka, Nunito, system-ui, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(ME.name,w/2,h/2+3,w-24)},plateTx=canvasTex(256,80,plateDraw),
+      plate=new THREE.Mesh(new THREE.PlaneGeometry(.64,.2),new THREE.MeshStandardMaterial({map:plateTx,roughness:.7}));
+    HOMEP.redrawPlate=()=>{const c=plateTx.image;plateDraw(c.getContext('2d'),c.width,c.height);plateTx.needsUpdate=true};   // the name plate follows ME.name
     plate.position.set(mx+.225,my+1.2,mz);plate.rotation.y=Math.PI/2;W.add(plate);BL.push({x:mx,z:mz,r:.4});HOMEP.mailbox=[mx,mz]}
   parts.forEach((list,m)=>{const mesh=new THREE.Mesh(mergeGeometries(list),m);mesh.castShadow=mesh.receiveShadow=true;W.add(mesh)})}
 // stepping stones across the stream behind the cottage (you can hop across on them)
@@ -1853,7 +1858,7 @@ function makePerson(){const root=new THREE.Group(),body=new THREE.Group();root.a
   return{root,body,torso,head,hair,her,arms,legs,hat,M}}
 function dress(p,c){const o=OUT[c.outfit],f=c.look==='her';p.M.shirt.color.setHex(o.shirt);p.M.skin.color.setHex(o.skin);p.M.pants.color.setHex(o.pants);
   p.M.hair.color.set(f?'#5e3622':'#3b2a20');p.hat.visible=o.hat!=null;if(o.hat!=null)p.M.hat.color.setHex(o.hat);p.hair.visible=o.hat==null;p.her.visible=f}
-// PPL[0] is you (Richard), PPL[1] the friend; `ctl` is whichever one you are playing, the other one wanders (always the other gender)
+// PPL[0] is you (named after your Google account), PPL[1] the friend; `ctl` is whichever one you are playing, the other one wanders (always the other gender)
 const PPL=[{name:ME.name,look:ME.look,outfit:0},{name:FRIEND.name,look:FRIEND.look,outfit:6}];
 try{const n=localStorage.getItem('myworld.friend');if(n)PPL[1].name=n}catch(_){}
 let ctl=0;
@@ -1997,8 +2002,8 @@ const touch=matchMedia('(pointer: coarse)').matches;
   msg.onclick=()=>{msg.style.display='none'};
   // app-style hints for Home Screen installs (set at run time so they work wherever the page is hosted)
   try{const mk=(n,c)=>{const m=document.createElement('meta');m.name=n;m.content=c;document.head.appendChild(m)};
-    mk('apple-mobile-web-app-capable','yes');mk('mobile-web-app-capable','yes');mk('apple-mobile-web-app-status-bar-style','black-translucent');mk('apple-mobile-web-app-title',"Richard's World");mk('theme-color','#a9d8f0');
-    const man={name:"Richard's World",short_name:'My World',start_url:location.href.split('#')[0],display:'fullscreen',display_override:['fullscreen','standalone'],orientation:'landscape',background_color:'#a9d8f0',theme_color:'#a9d8f0'};
+    mk('apple-mobile-web-app-capable','yes');mk('mobile-web-app-capable','yes');mk('apple-mobile-web-app-status-bar-style','black-translucent');mk('apple-mobile-web-app-title',APP.name);mk('theme-color','#a9d8f0');
+    const man={name:APP.name,short_name:APP.short,start_url:location.href.split('#')[0],display:'fullscreen',display_override:['fullscreen','standalone'],orientation:'landscape',background_color:'#a9d8f0',theme_color:'#a9d8f0'};
     const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));document.head.appendChild(l)}catch(e){}
   const lockLand=()=>{try{const o=screen.orientation;if(o&&o.lock)o.lock('landscape').catch(()=>{})}catch(e){}};
   const sync=()=>{const on=!!fsEl();btn.textContent=on?'✕':'⛶';btn.title=on?'Exit full screen':'Full screen (landscape on phones)';setTimeout(resize,150);setTimeout(resize,600)};
@@ -2093,7 +2098,7 @@ function makeCloudAdapter(cfg,prepare,fallback){
   const B=()=>sb.storage.from(cfg.bucket);
   const paths=rows=>rows.flatMap(r=>[r.path,r.thumb_path].filter(Boolean));
   const rowsFor=async key=>{const{data,error}=await sb.from(cfg.table).select('id,item_key,kind,path,thumb_path,name,size,created_at').eq('item_key',key).order('created_at');if(error)throw nice(error);return data||[]};
-  const auth={available:()=>!fail,user:()=>user?{id:user.id,email:user.email||'',name:(user.user_metadata&&(user.user_metadata.full_name||user.user_metadata.name))||''}:null,
+  const auth={available:()=>!fail,user:()=>user?{id:user.id,email:user.email||'',name:(user.user_metadata&&(user.user_metadata.full_name||user.user_metadata.name))||'',first:(user.user_metadata&&user.user_metadata.given_name)||''}:null,
     onChange:f=>listeners.push(f),
     async signIn(){await ready;if(fail)throw new Error('Sign-in is not available right now');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)throw nice(error)},
     async signOut(){await ready;if(sb)await sb.auth.signOut()}};
@@ -2169,11 +2174,11 @@ mdel.onclick=async()=>{if(mbusy||!cur)return;const s=cur,i=ci,it=s.items[i];if(!
   mbusy=false;if(cur===s)refreshItem(i)};
 
 // the character menu: outfits for whoever you are playing, swap who you play, and the friend's name
-const of=$('outfits'),ofl=$('oflist'),fname=$('fname'),tagP=$('tagP'),tagN=$('tagN'),tagD=$('tagD'),sayEl=$('say');tagD.textContent='Awaw';
+const of=$('outfits'),ofl=$('oflist'),fname=$('fname'),myname=$('myname'),tagP=$('tagP'),tagN=$('tagN'),tagD=$('tagD'),sayEl=$('say');tagD.textContent='Awaw';
 OUT.forEach((o,i)=>{const b=document.createElement('button');b.type='button';b.className='of';b.innerHTML='<i></i><span></span>';b.firstChild.style.background='#'+o.shirt.toString(16).padStart(6,'0');b.lastChild.textContent=o.n;
   b.onclick=()=>{PPL[ctl].outfit=i;dress(me,PPL[ctl]);refreshPeople()};ofl.appendChild(b)});
 function refreshPeople(){[...ofl.children].forEach((c,k)=>c.classList.toggle('on',k==PPL[ctl].outfit));$('who').textContent='Playing as '+PPL[ctl].name;$('swap').textContent='👫 Be '+PPL[1-ctl].name;
-  if(document.activeElement!==fname)fname.value=PPL[1].name;tagP.textContent=PPL[ctl].name;tagN.textContent=PPL[1-ctl].name;$('bo').title='Character: outfits, swap, names'}
+  if(document.activeElement!==fname)fname.value=PPL[1].name;if(document.activeElement!==myname)myname.value=PPL[0].name;tagP.textContent=PPL[ctl].name;tagN.textContent=PPL[1-ctl].name;$('bo').title='Character: outfits, swap, names'}
 $('bo').onclick=()=>of.style.display=of.style.display==='flex'?'none':'flex';
 $('swap').onclick=swapPeople;
 // ---- chat: send-only. Messages go to everyone who has the world open right now (nothing is stored or listed).
@@ -2199,8 +2204,18 @@ try{if(window.claude&&claude.use)claude.use('room').then(r=>{if(!r)return;room=r
   r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;toast(clean(d.n).slice(0,16)||'Someone',t)})}).catch(()=>{})}catch(_){}
 const saveName=()=>{const v=fname.value.replace(/\s+/g,' ').trim().slice(0,16)||FRIEND.name;PPL[1].name=v;try{localStorage.setItem('myworld.friend',v)}catch(_){}refreshPeople()};
 fname.addEventListener('change',saveName);fname.addEventListener('keydown',e=>{if(e.key==='Enter'){saveName();fname.blur()}else if(e.key==='Escape')fname.blur()});
-tagN.onclick=()=>{of.style.display='flex';fname.focus();fname.select()};
-refreshPeople();
+tagN.onclick=()=>{of.style.display='flex';const i=ctl===0?fname:myname;i.focus();i.select()};   // the far tag is whoever you aren't playing
+// your name follows your Google account (first name). Rename yourself in the character menu: it's remembered for that account on this device; clear it to go back to the Google name.
+const NK=u=>'myworld.name.'+(u&&u.id?u.id:'guest');
+const authName=u=>(u&&(u.first||String(u.name||'').trim().split(/\s+/)[0]))||'';
+function applyMyName(){const u=storage.auth&&storage.auth.user();let v='';try{v=localStorage.getItem(NK(u))||''}catch(_){}
+  const g=authName(u).slice(0,16);PPL[0].name=ME.name=v||g||'Explorer';myname.placeholder=g||'Explorer';
+  if(HOMEP.redrawPlate)HOMEP.redrawPlate();refreshPeople()}
+const saveMyName=()=>{const u=storage.auth&&storage.auth.user(),v=myname.value.replace(/\s+/g,' ').trim().slice(0,16);
+  try{if(v)localStorage.setItem(NK(u),v);else localStorage.removeItem(NK(u))}catch(_){}applyMyName()};
+myname.addEventListener('change',saveMyName);myname.addEventListener('keydown',e=>{if(e.key==='Enter'){saveMyName();myname.blur()}else if(e.key==='Escape')myname.blur()});
+applyMyName();
+if(storage.auth){storage.ready.then(()=>applyMyName());storage.auth.onChange(()=>applyMyName())}   // signed in (or out): take that account's name
 
 /* =========================== QUALITY =========================== */
 function setQuality(hq,save){HQ=hq;if(save)try{localStorage.setItem(QKEY,hq?'hi':'lo')}catch(_){}
@@ -2786,7 +2801,7 @@ function frame(){
 
 // signs use the rounded display font: wait briefly for it, then start
 await Promise.race([document.fonts.load('600 72px Fredoka'),new Promise(r=>setTimeout(r,2500))]).catch(()=>{});
-buildSigns();buildSummitSign();buildRaceText();buildStarTags();buildGymBoard();buildSunsetSign();setQuality(HQ,false);
+if(HOMEP.redrawPlate)HOMEP.redrawPlate();buildSigns();buildSummitSign();buildRaceText();buildStarTags();buildGymBoard();buildSunsetSign();setQuality(HQ,false);
 // the see-through tunnel also takes in everything solid (a bridge seen from below, the cottage, a tent, an umbrella, a lighthouse...):
 // all but the ground, the people, Awaw, the bikes, the grass and the flowers
 {const skip=new Set([grass.material,flowers.material]);[me.root,fr.root,dog.root,myBike.g,...PARKED.map(b=>b.g)].forEach(r=>r.traverse(o=>{if(o.material)skip.add(o.material)}));
