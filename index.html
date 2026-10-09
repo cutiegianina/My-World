@@ -1834,30 +1834,55 @@ for(let i=0;i<9;i++){const g=new THREE.Group(),wl=[1,-1].map(s=>{const w=new THR
 /* =========================== PEOPLE: you, and a friend who wanders the trails =========================== */
 // both are built from the same parts; a look picks him or her (her: long hair, lashes and a dress), plus an outfit and a name
 const smooth=(c,o={})=>std(c,{flatShading:false,roughness:.75,...o});
-const mDark=new THREE.MeshBasicMaterial({color:'#1d1b22'}),mBlush=new THREE.MeshBasicMaterial({color:'#ff9aa2',transparent:true,opacity:.65});
-const OUT=[{n:'Explorer',shirt:0xff7a3d,pants:0x2a4d8f,skin:0xffd9b3,hat:0xc4543c},{n:'Hiker',shirt:0x2f8f4a,pants:0x6b4a2e,skin:0xe0ac84,hat:0x8a5a2b},{n:'Beach',shirt:0x1ec8c8,pants:0xf2e6a8,skin:0xc68642,hat:0xffffff},{n:'Dev',shirt:0x333a66,pants:0x222222,skin:0x8d5524,hat:null},{n:'Sunny',shirt:0xf06292,pants:0x37474f,skin:0xf1c27d,hat:0xffeb3b},{n:'Runner',shirt:0xe63946,pants:0x1d3557,skin:0xd9a066,hat:null},{n:'Bloom',shirt:0xff8fb3,pants:0x6a5acd,skin:0xffd9b3,hat:null}];
+const mDark=new THREE.MeshBasicMaterial({color:'#1d1b22'}),mBlush=new THREE.MeshBasicMaterial({color:'#ff9aa2',transparent:true,opacity:.65}),
+  mWhite=new THREE.MeshBasicMaterial({color:'#ffffff'}),mMouth=new THREE.MeshBasicMaterial({color:'#9c4a44'});
+// acc: the neckerchief colour
+const OUT=[{n:'Explorer',shirt:0xff7a3d,pants:0x2a4d8f,skin:0xffd9b3,hat:0xc4543c,acc:0xfff1c9},{n:'Hiker',shirt:0x2f8f4a,pants:0x6b4a2e,skin:0xe0ac84,hat:0x8a5a2b,acc:0xffd34d},{n:'Beach',shirt:0x1ec8c8,pants:0xf2e6a8,skin:0xc68642,hat:0xffffff,acc:0xff7f6e},{n:'Dev',shirt:0x333a66,pants:0x222222,skin:0x8d5524,hat:null,acc:0xf5c542},{n:'Sunny',shirt:0xf06292,pants:0x37474f,skin:0xf1c27d,hat:0xffeb3b,acc:0xffffff},{n:'Runner',shirt:0xe63946,pants:0x1d3557,skin:0xd9a066,hat:null,acc:0xffffff},{n:'Bloom',shirt:0xff8fb3,pants:0x6a5acd,skin:0xffd9b3,hat:null,acc:0xffe08a}];
 function makePerson(){const root=new THREE.Group(),body=new THREE.Group();root.add(body);W.add(root);
-  const M={shirt:smooth('#ff7a3d'),skin:smooth('#ffd9b3',{roughness:.85}),pants:smooth('#2a4d8f'),shoe:smooth('#3b3a45'),hat:smooth('#c4543c'),hair:smooth('#3b2a20')};
+  const M={shirt:smooth('#ff7a3d'),skin:smooth('#ffd9b3',{roughness:.85}),pants:smooth('#2a4d8f'),shoe:smooth('#3b3a45'),hat:smooth('#c4543c'),hair:smooth('#3b2a20'),
+    trim:smooth('#b0522a'),band:smooth('#8a3b27'),acc:smooth('#fff1c9'),sole:smooth('#f4efe4')};
   const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.6,.62,6,16),M.shirt);torso.position.y=1.62;body.add(torso);
+  const belt=new THREE.Mesh(new THREE.TorusGeometry(.6,.055,8,28).rotateX(Math.PI/2),M.trim);belt.position.y=1.36;body.add(belt);
+  const scarf=new THREE.Mesh(new THREE.TorusGeometry(.47,.1,10,26).rotateX(Math.PI/2),M.acc);scarf.position.y=2.3;body.add(scarf);   // neckerchief
+  const knot=new THREE.Mesh(new THREE.SphereGeometry(.12,10,8),M.acc);knot.position.set(.2,2.26,.5);body.add(knot);
+  const tail=new THREE.Mesh(new THREE.CapsuleGeometry(.07,.2,4,8),M.acc);tail.position.set(.24,2.08,.54);tail.rotation.z=-.22;body.add(tail);
   const head=new THREE.Mesh(new THREE.SphereGeometry(.7,28,20),M.skin);head.position.y=2.9;body.add(head);
-  [-.24,.24].forEach(x=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),mDark);e.position.set(x,2.98,.64);body.add(e)});
-  [-.42,.42].forEach(x=>{const b=new THREE.Mesh(new THREE.CircleGeometry(.11,14),mBlush);b.position.set(x,2.78,.56);b.lookAt(x*3,2.78,1.9);body.add(b)});
-  const hair=new THREE.Mesh(new THREE.SphereGeometry(.73,24,12,0,Math.PI*2,0,Math.PI*.46),M.hair);hair.position.y=2.92;hair.rotation.x=-.2;body.add(hair);
+  [-1,1].forEach(s=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),M.skin);e.scale.set(.6,1,.8);e.position.set(s*.69,2.88,-.02);body.add(e)});   // ears
+  const eyes=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.26,2.96,.6);g.rotation.y=s*.38;
+    const e=new THREE.Mesh(new THREE.SphereGeometry(.115,14,12),mDark);e.scale.set(.9,1.2,.55);e.position.z=.03;g.add(e);
+    const h=new THREE.Mesh(new THREE.SphereGeometry(.036,8,6),mWhite);h.position.set(.035,.05,.085);g.add(h);body.add(g);return g});
+  [-1,1].forEach(s=>{const b=new THREE.Mesh(new THREE.CapsuleGeometry(.022,.13,3,6).rotateZ(Math.PI/2),M.hair);b.position.set(s*.28,3.2,.58);b.rotation.set(0,s*.42,s*.14);body.add(b)});   // brows
+  const mouth=new THREE.Mesh(new THREE.TorusGeometry(.085,.017,6,14,Math.PI).rotateZ(Math.PI),mMouth);mouth.position.set(0,2.76,.685);mouth.rotation.x=.3;body.add(mouth);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(.05,8,6),M.skin);nose.scale.set(1,.8,.8);nose.position.set(0,2.84,.69);body.add(nose);
+  [-.42,.42].forEach(x=>{const b=new THREE.Mesh(new THREE.CircleGeometry(.11,14),mBlush);b.position.set(x,2.76,.56);b.lookAt(x*3,2.76,1.9);body.add(b)});
+  // hair: a cap tipped back, a swept fringe, side tufts and one cowlick (all of it hides under a hat)
+  const hair=new THREE.Group();hair.position.y=2.92;body.add(hair);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(.745,24,14,0,Math.PI*2,0,Math.PI*.47),M.hair);cap.rotation.x=-.3;hair.add(cap);
+  [-2,-1,0,1,2].forEach(i=>{const a=i*.36,t=new THREE.Mesh(new THREE.SphereGeometry(.19,10,8),M.hair);t.scale.set(1,.72,.9);t.position.set(Math.sin(a)*.58,.46-Math.abs(i)*.03,Math.cos(a)*.56);t.rotation.set(0,a,i*.1);hair.add(t)});
+  [-1,1].forEach(s=>{const t=new THREE.Mesh(new THREE.CapsuleGeometry(.09,.18,4,8),M.hair);t.position.set(s*.62,.12,.22);t.rotation.z=s*.1;hair.add(t)});
+  const tuft=new THREE.Mesh(new THREE.CapsuleGeometry(.075,.1,4,8),M.hair);tuft.position.set(-.08,.8,.0);tuft.rotation.z=.9;hair.add(tuft);
+  const hairBack=new THREE.Mesh(new THREE.SphereGeometry(.715,24,14,Math.PI,Math.PI,0,Math.PI*.62),M.hair);hairBack.position.y=2.9;body.add(hairBack);   // the back of the head stays covered, hat or not
   const her=new THREE.Group();body.add(her);
   const back=new THREE.Mesh(new THREE.SphereGeometry(.74,20,14),M.hair);back.scale.set(1.04,1.24,.84);back.position.set(0,2.6,-.2);her.add(back);   // long hair down to the shoulders
   [-1,1].forEach(s=>{const l=new THREE.Mesh(new THREE.CapsuleGeometry(.19,.6,4,10),M.hair);l.position.set(s*.6,2.48,.1);l.rotation.z=s*.12;her.add(l);   // locks framing the face
     const lash=new THREE.Mesh(new THREE.BoxGeometry(.13,.03,.03),mDark);lash.position.set(s*.33,3.07,.61);lash.rotation.z=s*.5;her.add(lash)});
   const clip=new THREE.Mesh(new THREE.IcosahedronGeometry(.14,0),smooth('#ffd34d',{roughness:.5}));clip.position.set(.5,3.32,.38);her.add(clip);   // a little flower clip
   const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.6,.88,.72,18),M.shirt);skirt.position.y=1.05;her.add(skirt);   // the dress
-  const arms=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.7,2.08,0);const a=new THREE.Mesh(new THREE.CapsuleGeometry(.17,.5,4,10),M.shirt);a.position.y=-.38;g.add(a);
+  const arms=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.7,2.08,0);const a=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.5,4,10),M.skin);a.position.y=-.38;g.add(a);
+    const sl=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.2,4,10),M.shirt);sl.position.y=-.2;g.add(sl);   // short sleeve
     const hand=new THREE.Mesh(new THREE.SphereGeometry(.18,12,10),M.skin);hand.position.y=-.8;g.add(hand);g.rotation.z=s*.12;body.add(g);return g});
   const legs=[-1,1].map(s=>{const g=new THREE.Group();g.position.set(s*.27,1.02,0);const l=new THREE.Mesh(new THREE.CapsuleGeometry(.21,.42,4,10),M.pants);l.position.y=-.36;g.add(l);
-    const f=new THREE.Mesh(new THREE.SphereGeometry(.24,12,8),M.shoe);f.scale.set(1,.58,1.35);f.position.set(0,-.86,.08);g.add(f);body.add(g);return g});
-  const hat=new THREE.Group();[[.92,.08,3.48],[.5,.45,3.72]].forEach(([r,hh,y])=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,hh,20),M.hat);m.position.y=y;hat.add(m)});body.add(hat);
-  root.traverse(o=>{if(o.isMesh&&o.material!==mBlush&&o.material!==mDark)o.castShadow=true});
-  return{root,body,torso,head,hair,her,arms,legs,hat,M}}
+    const f=new THREE.Mesh(new THREE.SphereGeometry(.24,12,8),M.shoe);f.scale.set(1,.58,1.35);f.position.set(0,-.86,.08);g.add(f);
+    const so=new THREE.Mesh(new THREE.SphereGeometry(.25,12,8),M.sole);so.scale.set(1.04,.22,1.4);so.position.set(0,-.945,.09);g.add(so);body.add(g);return g});   // shoe with a light sole
+  const hat=new THREE.Group();   // a sun hat: brim, crown, domed top and a band
+  [[new THREE.CylinderGeometry(.95,.95,.07,28),3.4,M.hat],[new THREE.CylinderGeometry(.5,.54,.34,24),3.6,M.hat],[new THREE.SphereGeometry(.5,24,10,0,Math.PI*2,0,Math.PI/2).scale(1,.5,1),3.77,M.hat],[new THREE.CylinderGeometry(.545,.545,.1,24),3.48,M.band]].forEach(([ge,y,m])=>{const h=new THREE.Mesh(ge,m);h.position.y=y;hat.add(h)});body.add(hat);
+  root.traverse(o=>{if(o.isMesh&&o.material!==mBlush&&o.material!==mDark&&o.material!==mWhite&&o.material!==mMouth)o.castShadow=true});
+  return{root,body,torso,head,hair,her,arms,legs,hat,M,eyes,bl:{t:2+Math.random()*2,k:0}}}
 function dress(p,c){const o=OUT[c.outfit],f=c.look==='her';p.M.shirt.color.setHex(o.shirt);p.M.skin.color.setHex(o.skin);p.M.pants.color.setHex(o.pants);
-  p.M.hair.color.set(f?'#5e3622':'#3b2a20');p.hat.visible=o.hat!=null;if(o.hat!=null)p.M.hat.color.setHex(o.hat);p.hair.visible=o.hat==null;p.her.visible=f}
+  p.M.trim.color.setHex(o.shirt).multiplyScalar(.68);p.M.acc.color.setHex(o.acc);   // belt: a darker shade of the shirt
+  p.M.hair.color.set(f?'#5e3622':'#3b2a20');p.hat.visible=o.hat!=null;if(o.hat!=null){p.M.hat.color.setHex(o.hat);p.M.band.color.setHex(o.hat).multiplyScalar(.6)}p.hair.visible=o.hat==null;p.her.visible=f}
+// the eyes blink now and then (sometimes twice)
+function blinkTick(p,dt){const b=p.bl;b.t-=dt;if(b.t<=0){b.k=.13;b.t=2.2+Math.random()*3.8;if(Math.random()<.2)b.t=.35}if(b.k>0)b.k-=dt;const y=b.k>0?.12:1;p.eyes.forEach(e=>e.scale.y=y)}
 // PPL[0] is you (named after your Google account), PPL[1] the friend; `ctl` is whichever one you are playing, the other one wanders (always the other gender)
 const PPL=[{name:ME.name,look:ME.look,outfit:0},{name:FRIEND.name,look:FRIEND.look,outfit:6}];
 try{const n=localStorage.getItem('myworld.friend');if(n)PPL[1].name=n}catch(_){}
@@ -2083,7 +2108,7 @@ function makeMediaAdapter(prepare){
    The URL and the publishable key are meant to be public: what protects the data is the sign-in plus the row/folder rules in supabase-setup.sql.
    If the Supabase library can't be loaded at all, everything falls back to the local (this-device) adapter. */
 const SUPABASE={url:'https://mgknolgzrfcdkczwwusm.supabase.co',key:'sb_publishable_IZrr1XCK-Z-CimdKsdTUkQ_gQk74WfG',
-  cdn:'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',bucket:'media',table:'media_items',maxVideo:50*1024*1024,urlTtl:6*3600};
+  cdn:'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',bucket:'media',table:'media_items',maxVideo:50*1024*1024,urlTtl:6*3600,room:'tambayan-room'};
 function makeCloudAdapter(cfg,prepare,fallback){
   let sb=null,user=null,fail=null;const recs=new Map(),listeners=[];
   const nice=e=>{const m=(e&&e.message)||'';return new Error(/failed to fetch|networkerror|load failed|network request/i.test(m)?"Couldn't reach the server - check your connection":m||'Something went wrong')};
@@ -2102,7 +2127,18 @@ function makeCloudAdapter(cfg,prepare,fallback){
     onChange:f=>listeners.push(f),
     async signIn(){await ready;if(fail)throw new Error('Sign-in is not available right now');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)throw nice(error)},
     async signOut(){await ready;if(sb)await sb.auth.signOut()}};
-  return{auth,ready,
+  /* the chat room: a Supabase Realtime broadcast channel (nothing is stored). Same small surface as claude.ai's room: connected(), emit(), on(). */
+  let ch=null,rok=false,rlive=false;const rh={chat:[],join:[]};
+  const rm={connected:()=>rok,on:(t,f)=>{(rh[t]||(rh[t]=[])).push(f)},
+    async emit(t,data){if(!ch||!rok)throw new Error('Not connected yet');const r=await ch.send({type:'broadcast',event:t,payload:data});if(r!=='ok')throw new Error('Message didn\'t go through')},
+    async open(who){await ready;if(fail||!sb||!user||ch)return !!ch;const me=user.id;
+      ch=sb.channel(cfg.room,{config:{broadcast:{self:false,ack:true},presence:{key:me}}});
+      ch.on('broadcast',{event:'chat'},m=>rh.chat.forEach(f=>f({isMe:false,sameTab:false,data:m&&m.payload})));
+      ch.on('presence',{event:'join'},e=>{if(!rlive||!e||e.key===me)return;const n=e.newPresences&&e.newPresences[0]&&e.newPresences[0].n;rh.join.forEach(f=>f(n))});
+      ch.subscribe(st=>{rok=st==='SUBSCRIBED';if(rok){ch.track({n:who()});setTimeout(()=>{rlive=true},1500)}else if(st==='CLOSED'||st==='CHANNEL_ERROR'||st==='TIMED_OUT')rlive=false});
+      return true},
+    async close(){const c=ch;ch=null;rok=rlive=false;if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}}};
+  return{auth,ready,room:rm,
     async put(file,meta){const c=await need();if(!c)return fallback.put(file,meta);
       const p=await prepare(file),id=uid(),base=user.id+'/'+id,tp=p.thumb?base+'.thumb':null,up=[];
       try{
@@ -2200,8 +2236,17 @@ $('bchat').onclick=()=>chatEl.style.display==='flex'?closeChat():openChat();
 cv.addEventListener('pointerdown',()=>{if(chatEl.style.display==='flex'&&!chatIn.value.trim())closeChat()});
 $('chatgo').onclick=sendChat;$('chatx').onclick=closeChat;
 chatIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape')closeChat()});
-try{if(window.claude&&claude.use)claude.use('room').then(r=>{if(!r)return;room=r;$('bchat').hidden=false;
-  r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;toast(clean(d.n).slice(0,16)||'Someone',t)})}).catch(()=>{})}catch(_){}
+let roomHooked=null;
+function useRoom(r){room=r;$('bchat').hidden=false;if(roomHooked===r)return;roomHooked=r;
+  r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;toast(clean(d.n).slice(0,16)||'Someone',t)});
+  r.on('join',n=>toast('',(clean(n).slice(0,16)||'Someone')+' joined',true))}
+// on claude.ai the room is built in; on the hosted version it is a Realtime channel, open only while signed in
+try{if(window.claude&&claude.use)claude.use('room').then(r=>{if(r)useRoom(r)}).catch(()=>{})}catch(_){}
+if(storage.room&&storage.auth){
+  const syncRoom=async()=>{const R=storage.room;
+    if(storage.auth.user()){try{if(await R.open(()=>clean(PPL[0].name).slice(0,16)||'Someone'))useRoom(R)}catch(_){}}
+    else{await R.close();if(room===R){room=null;$('bchat').hidden=true;closeChat()}}};
+  storage.ready.then(syncRoom);storage.auth.onChange(()=>{syncRoom()})}
 const saveName=()=>{const v=fname.value.replace(/\s+/g,' ').trim().slice(0,16)||FRIEND.name;PPL[1].name=v;try{localStorage.setItem('myworld.friend',v)}catch(_){}refreshPeople()};
 fname.addEventListener('change',saveName);fname.addEventListener('keydown',e=>{if(e.key==='Enter'){saveName();fname.blur()}else if(e.key==='Escape')fname.blur()});
 tagN.onclick=()=>{of.style.display='flex';const i=ctl===0?fname:myname;i.focus();i.select()};   // the far tag is whoever you aren't playing
@@ -2757,7 +2802,7 @@ function frame(){
   P.position.y=groundY(P.position.x,P.position.z)+(riding?0:Math.abs(Math.sin(walkPh))*.1*walkAmt);
   if(sitting&&sitting.sw){const S=sitting.sw;P.position.x=S.x;P.position.z=S.z;P.position.y=groundY(S.x,S.z);P.rotation.y=sitting.face}   // riding the swing
   if(sitting)sitPose(me,sitting);
-  frTick(dt);dogTick(dt);
+  frTick(dt);dogTick(dt);blinkTick(me,dt);blinkTick(fr,dt);
   // places
   near=SPOTS.find(s=>Math.hypot(s.x-P.position.x,s.z-P.position.z)<4.5)||null;
   const nsl=near||sitting||riding?null:nearSeat();
