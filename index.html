@@ -403,6 +403,7 @@ const $=id=>document.getElementById(id);
 const TEX=window.TEX;
 document.title=APP.name;$('gtitle').textContent=APP.name;{const lb=$('loading').querySelector('b');if(lb)lb.textContent=APP.name}
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));   // an angle brought back into -PI..PI (a heading is a running total of every turn, so it can drift far past a full circle)
 const sstep=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};
 const lerp=(a,b,t)=>a+(b-a)*t;
 let seed=20261004;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;   // seeded: same world every visit
@@ -2581,14 +2582,17 @@ const of=$('outfits'),ofl=$('oflist'),fname=$('fname'),myname=$('myname'),tagP=$
 /* ---- your state follows your account: look, names, the friend, who you play and where you stand. This device keeps a copy (so a guest, or no network, still gets it back);
    a signed-in account also keeps it in the cloud, so a new device or a cleared browser starts where you left off. Nothing is written to the cloud until what is saved there
    has been read, so a slow or failed read can never wipe it. ---- */
-let cloud=false,dirty=false,saveT=0,posDone=false,lastPos=null,myCustom='';   // myCustom: the name you chose for yourself ('' = follow your Google name)   // cloud: the saved state was read (or there is none yet), so changes may be written
+let cloud=false,dirty=false,saveT=0,posDone=false,lastPos=null,myCustom='',PST='not started';   // PST: what the saved-state sync is doing, shown by ?debug
+   // myCustom: the name you chose for yourself ('' = follow your Google name)   // cloud: the saved state was read (or there is none yet), so changes may be written
 const POSK=u=>'myworld.pos.'+(u&&u.id?u.id:'guest');
-const posNow=()=>({x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+P.rotation.y.toFixed(2)});
+const posNow=()=>({x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+wrapA(P.rotation.y).toFixed(2)});
 function stateOut(){
   return{v:1,name:myCustom,look:packLook(PPL[0]),friend:{name:PPL[1].name,look:packLook(PPL[1])},ctl,pos:posNow()}}
 function touchState(now){if(!cloud)return;dirty=true;if(now)flushState();else if(!saveT)saveT=setTimeout(flushState,3000)}
-function flushState(){clearTimeout(saveT);saveT=0;const S=storage.session;if(!cloud||!dirty||(S&&!S.active()))return;dirty=false;   // (a second tab that is still waiting doesn't write)
-  storage.profile.save(stateOut()).then(r=>{if(r==='retry')dirty=true;else if(r==='off')cloud=false},()=>{dirty=true})}
+function flushState(){clearTimeout(saveT);saveT=0;const S=storage.session;
+  if(cloud&&dirty&&S&&!S.active()){PST='waiting: this tab has not been confirmed as your active session yet ('+S.state()+')';return}
+  if(!cloud||!dirty)return;dirty=false;
+  storage.profile.save(stateOut()).then(r=>{if(r==='ok')PST='saved at '+new Date().toLocaleTimeString();else if(r==='retry'){dirty=true;PST='retrying (network)'}else if(r==='off'){cloud=false;PST='SAVE REFUSED (see the [profile] message in the console)'}},()=>{dirty=true;PST='retrying (error)'})}
 function savePos(now){if(!posDone)return;const p=posNow(),u=storage.auth&&storage.auth.user();   // (never before the saved spot was restored, or the spawn point would overwrite it)
   if(!now&&lastPos&&lastPos.c===ctl&&Math.hypot(p.x-lastPos.x,p.z-lastPos.z)<1&&Math.abs(p.r-lastPos.r)<.3)return;lastPos={...p,c:ctl};
   try{localStorage.setItem(POSK(u),JSON.stringify({pos:p,ctl}))}catch(_){}touchState(now)}
@@ -2598,7 +2602,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){savePos(tr
 function restorePos(src){if(posDone)return;posDone=true;if(!src||typeof src!=='object')return;
   if((src.ctl===0||src.ctl===1)&&src.ctl!==ctl)swapPeople();
   const q=src.pos;if(!q||![q.x,q.z,q.r].every(Number.isFinite)||!walkable(q.x,q.z))return;
-  P.position.set(q.x,groundY(q.x,q.z),q.z);P.rotation.y=q.r;
+  P.position.set(q.x,groundY(q.x,q.z),q.z);P.rotation.y=wrapA(q.r);
   const f=[[3.2,-2.4],[-3.2,-2.4],[0,-3.6],[0,3.6]].find(o=>walkable(q.x+o[0],q.z+o[1]));
   if(f){fr.root.position.set(q.x+f[0],groundY(q.x+f[0],q.z+f[1]),q.z+f[1]);Object.assign(FR,{mode:'idle',wait:2.5,cool:4,sayT:0});FR.exit=null;DOG.reset=1}}
 function stateIn(s,u){const put=(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}};
@@ -2611,12 +2615,12 @@ function stateIn(s,u){const put=(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}
 async function syncState(){applyMyName();applyMyLook();   // (what this device remembers, straight away)
   const A=storage.auth,u=A&&A.user();cloud=false;
   const local=()=>{let j=null;try{j=JSON.parse(localStorage.getItem(POSK(u))||'null')}catch(_){}restorePos(j)};
-  if(!u||!storage.profile){local();return}
-  let s;try{s=await storage.profile.load()}catch(_){s=undefined}
+  if(!u||!storage.profile){PST=u?'no cloud profile here':'guest: kept on this device only';local();return}
+  PST='reading your saved state...';let s;try{s=await storage.profile.load()}catch(_){s=undefined}
   if(!(A.user()&&A.user().id===u.id))return;   // (signed out, or switched, while it loaded)
-  if(s===undefined){local();return}   // can't be read (offline, or no table yet): this device's copy, and nothing written over theirs
+  if(s===undefined){PST='CANNOT READ your saved state (see the [profile] message in the console)';local();return}   // can't be read (offline, or no table yet): this device's copy, and nothing written over theirs
   if(s&&typeof s==='object')stateIn(s,u);else local();
-  cloud=true;if(!s)touchState(true)}   // an account with nothing saved yet: save what you have
+  cloud=true;PST=s?'loaded':'nothing saved yet: creating your row';if(!s)touchState(true)}   // an account with nothing saved yet: save what you have
 const LKEY=u=>'myworld.look.'+(u&&u.id?u.id:'guest');   // how you look is remembered per account on this device (the friend's, for the browser)
 function saveLook(i){try{localStorage.setItem(i===0?LKEY(storage.auth&&storage.auth.user()):'myworld.look.friend',JSON.stringify(packLook(PPL[i])))}catch(_){}touchState()}
 // the preview: its own little renderer (made the first time the menu opens), so you can see your face and turn around to see your back
@@ -3318,10 +3322,11 @@ function dogAnim(dt){const D=DOG,d=dog,gal=sstep(6,9.5,D.v);
    once every few seconds while you stand still) and who is on which bike / seat. The friend and Awaw are never sent: they stay yours alone.
    Two Realtime messages kinds: broadcast 'p' = position, and presence = look (skin, hair, face, outfit), name, bike, seat, parked bikes. Nothing is stored anywhere. */
 const MP=(()=>{
-const WS=storage.world,none={key:()=>'',say(){},tick(){},tags(){},each(){},bike(){}};
+const WS=storage.world,none={key:()=>'',say(){},tick(){},tags(){},each(){},bike(){},dbg:()=>null};
 if(!WS||!storage.auth)return none;
 const MAXR=24,remotes=new Map(),pool=[],tagBox=tagN.parentNode,before=(a,ka,b,kb)=>a<b||(a===b&&ka<kb);
-const my={b:-1,bt:0,s:null,st:0,pk:{}};let myKey='',on=false,lastHeal=0,acc=0,lastSend=0,lastTrack=0,trackDue=false,dueMin=500,lastSig='',lp={x:P.position.x,z:P.position.z},sent={m:-1,r:0};
+const my={b:-1,bt:0,s:null,st:0,pk:{}};const tp={x:0,z:0},drops={bad:0,last:''};   // tp: where my last presence update said I was; drops: position messages we could not use
+let myKey='',on=false,lastHeal=0,acc=0,lastSend=0,lastTrack=0,trackDue=false,dueMin=500,lastSig='',lp={x:P.position.x,z:P.position.z},sent={m:-1,r:0};
 PARKED.forEach(b=>{if(!b.home)b.home={x:b.g.position.x,y:b.g.position.y,z:b.g.position.z,ry:b.g.rotation.y}});   // where each bike lives at the rack
 const num=(v,lo,hi)=>{v=+v;return isFinite(v)&&v>=lo&&v<=hi?v:null};
 
@@ -3338,6 +3343,9 @@ function dropRemote(R){R.rig.root.visible=false;showBike(R,-1);standPose(R.rig);
 function onSync(st){const seen=new Set();
   for(const k in st){if(k===myKey)continue;const arr=st[k],e=arr&&arr[arr.length-1];if(!e||typeof e!=='object')continue;
     const R=remotes.get(k)||addRemote(k);if(!R)continue;seen.add(k);if(!R.has&&early.has(k)){applyPos(R,early.get(k));early.delete(k)}
+    R.nm=clean(e.n).slice(0,16)||'Someone';
+    // the presence entry carries their last known spot: enough to show them at once, and a fallback if their live position messages stop arriving
+    if(Number.isFinite(e.x)&&Number.isFinite(e.z)&&(!R.has||performance.now()-R.lastP>8000))applyPos(R,{x:e.x,z:e.z,r:e.r||0,m:0});
     setTag(R.tag,clean(e.n).slice(0,16)||'Someone',(e.u|0)>0&&(e.u|0)<STATUS.length?e.u|0:0);   // (anything unknown counts as active)
     const lk=unpackLook(e.a,e.o),sg=packLook(lk).join();if(sg!==R.lk){R.lk=sg;dress(R.rig,lk)}
     R.b=Number.isInteger(e.b)&&e.b>=0&&e.b<PARKED.length?e.b:-1;R.bt=+e.bt||0;
@@ -3374,14 +3382,16 @@ function bikeChanged(){const now=Date.now();
 const seatNow=()=>!sitting?null:sitting.kind==='ground'&&!SEATS.includes(sitting)?-1:SEATS.indexOf(sitting);
 function pushState(force){const now=performance.now();if(!on)return;
   const gap=force?120:500;if(now-lastTrack<gap){dueMin=trackDue?Math.min(dueMin,gap):gap;trackDue=true;return}
-  lastTrack=now;trackDue=false;dueMin=500;const p=PPL[ctl];WS.track({n:clean(p.name).slice(0,16)||'Someone',a:packLook(p),u:MYST,b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
+  lastTrack=now;trackDue=false;dueMin=500;tp.x=P.position.x;tp.z=P.position.z;const p=PPL[ctl];
+  WS.track({n:clean(p.name).slice(0,16)||'Someone',a:packLook(p),u:MYST,x:+P.position.x.toFixed(1),z:+P.position.z.toFixed(1),r:+wrapA(P.rotation.y).toFixed(2),b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
 function sendPos(force,mv){const now=performance.now();lastSend=now;sent.m=mv;sent.r=P.rotation.y;
-  WS.send('p',{k:myKey,x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+P.rotation.y.toFixed(2),m:mv})}
+  WS.send('p',{k:myKey,x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+wrapA(P.rotation.y).toFixed(2),m:mv})}
 // a position can arrive a moment BEFORE that person's presence entry (they are two separate messages): keep the latest one per person and use it as soon as they appear,
 // otherwise a standing-still stranger would stay invisible until they moved
 const early=new Map();
-function applyPos(R,d){const x=num(d.x,-2000,2000),z=num(d.z,-2000,2000),r=num(d.r,-20,20);if(x==null||z==null||r==null)return;
-  const now=performance.now(),mv=d.m?1:0;
+function applyPos(R,d){const x=num(d.x,-2000,2000),z=num(d.z,-2000,2000),r0=num(d.r,-1e6,1e6);
+  if(x==null||z==null||r0==null){drops.bad++;drops.last=JSON.stringify(d).slice(0,90);return}
+  const r=wrapA(r0),now=performance.now(),mv=d.m?1:0;
   if(!R.has){R.has=true;R.x=R.tx=x;R.z=R.tz=z;R.r=r;R.vx=R.vz=0;R.rig.root.visible=true}
   else{const dt=(now-R.lastP)/1000;if(mv&&dt>.05&&dt<1.5){R.vx=(x-R.tx)/dt;R.vz=(z-R.tz)/dt}else R.vx=R.vz=0}
   R.tx=x;R.tz=z;R.tr=r;R.m=mv;R.lastP=now}
@@ -3406,7 +3416,8 @@ function tick(dt,t){
     const p=PPL[ctl],sig=clean(p.name)+'|'+packLook(p).join()+'|'+MYST+'|'+my.s+'|'+my.b;
     if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
     acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
-      if(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>(remotes.size?4000:20000))sendPos(false,mv)}   // standing still: a small 'still here' every 4 s with company (so nobody stays invisible for long), every 20 s alone
+      if(mv||mv!==sent.m||Math.abs(wrapA(P.rotation.y-sent.r))>.05||performance.now()-lastSend>(remotes.size?4000:20000))sendPos(false,mv)}   // standing still: a small 'still here' every 4 s with company (so nobody stays invisible for long), every 20 s alone
+    if(performance.now()-lastTrack>5000&&Math.hypot(P.position.x-tp.x,P.position.z-tp.z)>1.5)pushState(false);
     // heal a missed update: if the list of who is here (from the server) disagrees with who we are showing, take the server's list
     if(performance.now()-lastHeal>3000){lastHeal=performance.now();const st=WS.state(),n=Math.min(MAXR,Object.keys(st).filter(k=>k!==myKey).length);if(n!==remotes.size)onSync(st)}}
   const now=performance.now();
@@ -3427,8 +3438,17 @@ function tick(dt,t){
 function tags(){remotes.forEach(R=>{const q=R.rig.root.position;
   if(R.has&&!open)tagAt(R.tag,q.x,q.y,q.z,8,70);else R.tag.style.display='none';
   if(R.has&&!open&&R.sayUntil>performance.now())tagAt(R.say,q.x,q.y+4.4,q.z,-8,70,true);else if(R.say.style.display!=='none')R.say.style.display='none'})}
-return{key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){rich(R.say,text);R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
+function dbg(){const o=Object.entries(WS.state()).filter(([k])=>k!==myKey),now=performance.now();
+  return{conn:WS.connected(),listed:o.length,shown:remotes.size,withPos:[...remotes.values()].filter(R=>R.has).length,drops:{...drops},peers:[...remotes.values()].map(R=>(R.nm||'?')+(R.has?' '+((now-R.lastP)/1000).toFixed(1)+'s ago':' (no position yet)'))}}
+return{dbg,key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){rich(R.say,text);R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
 /*MP-END*/
+// add ?debug to the address to see what the connection is doing (handy when "I can't see anyone" needs a real reason)
+if(storage.session)storage.session.onChange(st=>console.info('[session]',st));
+if(/[?&]debug\b/.test(location.search)){const d=document.createElement('pre');d.style.cssText="position:fixed;left:8px;top:96px;z-index:60;margin:0;padding:6px 9px;background:rgba(20,18,30,.8);color:#d6ffe8;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;border-radius:8px;pointer-events:none;max-width:78vw;white-space:pre-wrap";document.body.appendChild(d);
+  setInterval(()=>{const g=MP.dbg(),S=storage.session,A=storage.auth&&storage.auth.user();
+    d.textContent=['signed in: '+(A?'yes':'no (guest)'),'session: '+(S?S.state():'n/a'),'world: '+(g?(g.conn?'connected':'NOT connected'):'n/a'),
+      g?'server lists '+g.listed+' other(s); showing '+g.shown+' ('+g.withPos+' with a position)':'',...(g?g.peers.map(x=>'   '+x):[]),
+      g&&g.drops.bad?'unusable position messages: '+g.drops.bad+' e.g. '+g.drops.last:'','my heading: '+P.rotation.y.toFixed(2)+' rad','saved state: '+PST].filter(Boolean).join('\n')},1000)}
 
 const clockT=new THREE.Clock();let t=0,walkPh=0,walkAmt=0,frames=0,lift=0,lastStep=0;
 function frame(){
@@ -3444,7 +3464,7 @@ function frame(){
     const nx=P.position.x+dx*sp,nz=P.position.z+dz*sp;
     const ok=(x,z)=>walkable(x,z)&&!crossWall(P.position.x,P.position.z,x,z);
     if(ok(nx,nz)){P.position.x=nx;P.position.z=nz}else if(ok(nx,P.position.z))P.position.x=nx;else if(ok(P.position.x,nz))P.position.z=nz;
-    let dr=Math.atan2(dx,dz)-P.rotation.y;dr=Math.atan2(Math.sin(dr),Math.cos(dr));P.rotation.y+=dr*Math.min(1,dt*14)}
+    let dr=Math.atan2(dx,dz)-P.rotation.y;dr=Math.atan2(Math.sin(dr),Math.cos(dr));P.rotation.y+=dr*Math.min(1,dt*14);if(P.rotation.y>6.3||P.rotation.y<-6.3)P.rotation.y=wrapA(P.rotation.y)}
   if(!sitting)BL.forEach(b=>{const dx=P.position.x-b.x,dz=P.position.z-b.z,d=Math.hypot(dx,dz);if(d<b.r){P.position.x=b.x+dx/d*b.r;P.position.z=b.z+dz/d*b.r}});
   if(!sitting)BLS.forEach(b=>{const ax=b.a[0],az=b.a[2],ex=b.b[0]-ax,ez=b.b[2]-az,t=clamp(((P.position.x-ax)*ex+(P.position.z-az)*ez)/(ex*ex+ez*ez),0,1),qx=ax+ex*t,qz=az+ez*t,dx=P.position.x-qx,dz=P.position.z-qz,d=Math.hypot(dx,dz);
     if(d<b.r&&d>1e-6){P.position.x=qx+dx/d*b.r;P.position.z=qz+dz/d*b.r}});   // bridge rails
