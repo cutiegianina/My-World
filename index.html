@@ -2309,7 +2309,7 @@ function makeMediaAdapter(prepare){
    The URL and the publishable key are meant to be public: what protects the data is the sign-in plus the row/folder rules in supabase-setup.sql.
    If the Supabase library can't be loaded at all, everything falls back to the local (this-device) adapter. */
 const SUPABASE={url:'https://mgknolgzrfcdkczwwusm.supabase.co',key:'sb_publishable_IZrr1XCK-Z-CimdKsdTUkQ_gQk74WfG',
-  cdn:'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',bucket:'media',table:'media_items',maxVideo:50*1024*1024,urlTtl:6*3600,room:'tambayan-room'};
+  cdn:'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',bucket:'media',table:'media_items',profiles:'profiles',maxVideo:50*1024*1024,urlTtl:6*3600,room:'tambayan-room'};
 function makeCloudAdapter(cfg,prepare,fallback){
   let sb=null,user=null,fail=null;const recs=new Map(),listeners=[];
   const nice=e=>{const m=(e&&e.message)||'';return new Error(/failed to fetch|networkerror|load failed|network request/i.test(m)?"Couldn't reach the server - check your connection":m||'Something went wrong')};
@@ -2377,7 +2377,12 @@ function makeCloudAdapter(cfg,prepare,fallback){
       wch.subscribe(st=>{const ok=st==='SUBSCRIBED';if(ok!==wok){wok=ok;wfire('status',ok)}});
       return true},
     async close(){const c=wch;wch=null;if(wok){wok=false;wfire('status',false)}if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}}};
-  return{auth,ready,session,room:rm,world,
+  /* the account's saved state (one row, one small JSON document: look, names, the friend, where you stand; see supabase-profiles.sql).
+     load(): the state, null if there is none yet, undefined if it can't be read. save(): 'ok', 'retry' (network), or 'off' (no table / not allowed: stop trying). */
+  const profile={async load(){await ready;if(fail||!sb||!user)return undefined;const{data,error}=await sb.from(cfg.profiles).select('state').eq('user_id',user.id).maybeSingle();if(error)return undefined;return data?data.state:null},
+    async save(state){await ready;if(fail||!sb||!user)return'retry';const{error}=await sb.from(cfg.profiles).upsert({user_id:user.id,state,updated_at:new Date().toISOString()});
+      if(!error)return'ok';return/failed to fetch|networkerror|load failed|network request/i.test(error.message||'')?'retry':'off'}};
+  return{auth,ready,session,room:rm,world,profile,
     async put(file,meta){const c=await need();if(!c)return fallback.put(file,meta);
       const p=await prepare(file),id=uid(),base=user.id+'/'+id,tp=p.thumb?base+'.thumb':null,up=[];
       try{
@@ -2460,8 +2465,47 @@ mdel.onclick=async()=>{if(mbusy||!cur)return;const s=cur,i=ci,it=s.items[i];if(!
 
 // the character menu: skin, face, hair and outfit for whoever you are playing (the outfit is clothes only), swap who you play, and the names
 const of=$('outfits'),ofl=$('oflist'),fname=$('fname'),myname=$('myname'),tagP=$('tagP'),tagN=$('tagN'),tagD=$('tagD'),sayEl=$('say');tagD.textContent='Awaw';
+/* ---- your state follows your account: look, names, the friend, who you play and where you stand. This device keeps a copy (so a guest, or no network, still gets it back);
+   a signed-in account also keeps it in the cloud, so a new device or a cleared browser starts where you left off. Nothing is written to the cloud until what is saved there
+   has been read, so a slow or failed read can never wipe it. ---- */
+let cloud=false,dirty=false,saveT=0,posDone=false,lastPos=null,myCustom='';   // myCustom: the name you chose for yourself ('' = follow your Google name)   // cloud: the saved state was read (or there is none yet), so changes may be written
+const POSK=u=>'myworld.pos.'+(u&&u.id?u.id:'guest');
+const posNow=()=>({x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+P.rotation.y.toFixed(2)});
+function stateOut(){
+  return{v:1,name:myCustom,look:packLook(PPL[0]),friend:{name:PPL[1].name,look:packLook(PPL[1])},ctl,pos:posNow()}}
+function touchState(now){if(!cloud)return;dirty=true;if(now)flushState();else if(!saveT)saveT=setTimeout(flushState,3000)}
+function flushState(){clearTimeout(saveT);saveT=0;const S=storage.session;if(!cloud||!dirty||(S&&!S.active()))return;dirty=false;   // (a second tab that is still waiting doesn't write)
+  storage.profile.save(stateOut()).then(r=>{if(r==='retry')dirty=true;else if(r==='off')cloud=false},()=>{dirty=true})}
+function savePos(now){if(!posDone)return;const p=posNow(),u=storage.auth&&storage.auth.user();   // (never before the saved spot was restored, or the spawn point would overwrite it)
+  if(!now&&lastPos&&lastPos.c===ctl&&Math.hypot(p.x-lastPos.x,p.z-lastPos.z)<1&&Math.abs(p.r-lastPos.r)<.3)return;lastPos={...p,c:ctl};
+  try{localStorage.setItem(POSK(u),JSON.stringify({pos:p,ctl}))}catch(_){}touchState(now)}
+setInterval(()=>savePos(false),5000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){savePos(true);flushState()}});addEventListener('pagehide',()=>{savePos(true);flushState()});
+// back to where you were, once per visit: only onto ground that can be walked on, and the friend beside you
+function restorePos(src){if(posDone)return;posDone=true;if(!src||typeof src!=='object')return;
+  if((src.ctl===0||src.ctl===1)&&src.ctl!==ctl)swapPeople();
+  const q=src.pos;if(!q||![q.x,q.z,q.r].every(Number.isFinite)||!walkable(q.x,q.z))return;
+  P.position.set(q.x,groundY(q.x,q.z),q.z);P.rotation.y=q.r;
+  const f=[[3.2,-2.4],[-3.2,-2.4],[0,-3.6],[0,3.6]].find(o=>walkable(q.x+o[0],q.z+o[1]));
+  if(f){fr.root.position.set(q.x+f[0],groundY(q.x+f[0],q.z+f[1]),q.z+f[1]);Object.assign(FR,{mode:'idle',wait:2.5,cool:4,sayT:0});FR.exit=null;DOG.reset=1}}
+function stateIn(s,u){const put=(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}};
+  if(Array.isArray(s.look))put(LKEY(u),JSON.stringify(packLook(unpackLook(s.look))));
+  const nm=clean(s.name).slice(0,16);try{if(nm)localStorage.setItem(NK(u),nm);else localStorage.removeItem(NK(u))}catch(_){}
+  const f=s.friend&&typeof s.friend==='object'?s.friend:{},fn=clean(f.name).slice(0,16);
+  if(Array.isArray(f.look)){Object.assign(PPL[1],unpackLook(f.look));put('myworld.look.friend',JSON.stringify(packLook(PPL[1])))}
+  if(fn){PPL[1].name=fn;put('myworld.friend',fn)}
+  applyMyName();applyMyLook();dress(me,PPL[ctl]);dress(fr,PPL[1-ctl]);refreshPeople();restorePos(s)}
+async function syncState(){applyMyName();applyMyLook();   // (what this device remembers, straight away)
+  const A=storage.auth,u=A&&A.user();cloud=false;
+  const local=()=>{let j=null;try{j=JSON.parse(localStorage.getItem(POSK(u))||'null')}catch(_){}restorePos(j)};
+  if(!u||!storage.profile){local();return}
+  let s;try{s=await storage.profile.load()}catch(_){s=undefined}
+  if(!(A.user()&&A.user().id===u.id))return;   // (signed out, or switched, while it loaded)
+  if(s===undefined){local();return}   // can't be read (offline, or no table yet): this device's copy, and nothing written over theirs
+  if(s&&typeof s==='object')stateIn(s,u);else local();
+  cloud=true;if(!s)touchState(true)}   // an account with nothing saved yet: save what you have
 const LKEY=u=>'myworld.look.'+(u&&u.id?u.id:'guest');   // how you look is remembered per account on this device (the friend's, for the browser)
-function saveLook(i){try{localStorage.setItem(i===0?LKEY(storage.auth&&storage.auth.user()):'myworld.look.friend',JSON.stringify(packLook(PPL[i])))}catch(_){}}
+function saveLook(i){try{localStorage.setItem(i===0?LKEY(storage.auth&&storage.auth.user()):'myworld.look.friend',JSON.stringify(packLook(PPL[i])))}catch(_){}touchState()}
 // the preview: its own little renderer (made the first time the menu opens), so you can see your face and turn around to see your back
 const PV=(()=>{const cv=$('pv'),wrap=$('pvw');let R,sc,cam,rig,run=0,last=0,yaw=.5,auto=true,drag=null,cur={y:1.95,d:9.8},to={y:1.95,d:9.8},tt=0,fail=false,pend=null,hatOn=true;
   function init(){if(R||fail)return !fail;
@@ -2528,22 +2572,23 @@ if(storage.room&&storage.auth){
     if(storage.auth.user()&&storage.session.active()){try{if(await R.open(()=>clean(PPL[0].name).slice(0,16)||'Someone'))useRoom(R)}catch(_){}}
     else{await R.close();if(room===R){room=null;$('bchat').hidden=true;closeChat()}}};
   storage.ready.then(syncRoom);storage.auth.onChange(()=>{syncRoom()});storage.session.onChange(()=>{syncRoom()})}
-const saveName=()=>{const v=fname.value.replace(/\s+/g,' ').trim().slice(0,16)||FRIEND.name;PPL[1].name=v;try{localStorage.setItem('myworld.friend',v)}catch(_){}refreshPeople()};
+const saveName=()=>{const v=fname.value.replace(/\s+/g,' ').trim().slice(0,16)||FRIEND.name;PPL[1].name=v;try{localStorage.setItem('myworld.friend',v)}catch(_){}refreshPeople();touchState()};
 fname.addEventListener('change',saveName);fname.addEventListener('keydown',e=>{if(e.key==='Enter'){saveName();fname.blur()}else if(e.key==='Escape')fname.blur()});
 tagN.onclick=()=>{of.style.display='flex';PV.start();const i=ctl===0?fname:myname;i.focus();i.select()};   // the far tag is whoever you aren't playing
 // your name follows your Google account (first name). Rename yourself in the character menu: it's remembered for that account on this device; clear it to go back to the Google name.
 const NK=u=>'myworld.name.'+(u&&u.id?u.id:'guest');
 const authName=u=>(u&&(u.first||String(u.name||'').trim().split(/\s+/)[0]))||'';
 function applyMyName(){const u=storage.auth&&storage.auth.user();let v='';try{v=localStorage.getItem(NK(u))||''}catch(_){}
-  const g=authName(u).slice(0,16);PPL[0].name=ME.name=v||g||'Explorer';myname.placeholder=g||'Explorer';
+  const g=authName(u).slice(0,16);myCustom=v;PPL[0].name=ME.name=v||g||'Explorer';myname.placeholder=g||'Explorer';
   if(HOMEP.redrawPlate)HOMEP.redrawPlate();refreshPeople()}
 const saveMyName=()=>{const u=storage.auth&&storage.auth.user(),v=myname.value.replace(/\s+/g,' ').trim().slice(0,16);
-  try{if(v)localStorage.setItem(NK(u),v);else localStorage.removeItem(NK(u))}catch(_){}applyMyName()};
+  try{if(v)localStorage.setItem(NK(u),v);else localStorage.removeItem(NK(u))}catch(_){}applyMyName();touchState()};
 myname.addEventListener('change',saveMyName);myname.addEventListener('keydown',e=>{if(e.key==='Enter'){saveMyName();myname.blur()}else if(e.key==='Escape')myname.blur()});
 function applyMyLook(){const u=storage.auth&&storage.auth.user();let j=null;try{j=JSON.parse(localStorage.getItem(LKEY(u))||'null')}catch(_){}
   if(Array.isArray(j)){Object.assign(PPL[0],unpackLook(j));dress(me,PPL[ctl]);dress(fr,PPL[1-ctl]);refreshPeople()}else if(u)saveLook(0)}   // (an account with no saved look keeps the one you have)
 applyMyName();applyMyLook();
-if(storage.auth){storage.ready.then(()=>{applyMyName();applyMyLook()});storage.auth.onChange(()=>{applyMyName();applyMyLook()})}   // signed in (or out): take that account's name and look
+storage.ready.then(syncState);if(storage.auth)storage.auth.onChange(()=>syncState());
+if(storage.session)storage.session.onChange(()=>{if(storage.session.active())flushState()});   // (a save held back while this tab was still checking for another session)   // signed in (or out): take that account's state
 
 /* =========================== QUALITY =========================== */
 function setQuality(hq,save){HQ=hq;if(save)try{localStorage.setItem(QKEY,hq?'hi':'lo')}catch(_){}
