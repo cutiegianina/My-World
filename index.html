@@ -27,7 +27,8 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #coords{position:fixed;left:16px;top:calc(108px + env(safe-area-inset-top,0px));display:none;z-index:2;max-width:min(300px,calc(100vw - 32px));background:rgba(255,250,240,.93);color:var(--ink);font:700 13px/1.5 var(--body);padding:8px 12px;border-radius:12px;box-shadow:var(--shadow);white-space:pre-line;cursor:pointer;font-variant-numeric:tabular-nums}
 #lap{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:none;z-index:2;max-width:calc(100vw - 130px);background:var(--paper);color:var(--ink);font:700 15px/1.3 var(--body);padding:7px 16px;border-radius:999px;box-shadow:var(--shadow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;pointer-events:none}
 .tag{position:fixed;left:0;top:0;display:none;font:600 13px/1.2 var(--display);color:#fff;background:rgba(32,28,44,.52);padding:2px 9px 3px;border-radius:999px;white-space:nowrap;pointer-events:none;z-index:1}
-.tagn{pointer-events:auto;cursor:pointer}.tagn::after{content:' ✎';opacity:.75;font-size:11px}
+.tagn{pointer-events:auto;cursor:pointer}
+.tag .sb{margin-left:6px;font-size:11px;font-weight:700;opacity:.95}.tag .sb.dot{display:inline-block;width:7px;height:7px;padding:0;border-radius:50%;background:#4cd964;box-shadow:0 0 0 1.5px rgba(255,255,255,.55);vertical-align:1px}   /* a name tag: the name, then a green dot (active) or the status */
 #say{position:fixed;left:0;top:0;display:none;background:var(--paper);color:var(--ink);font:600 14px var(--display);padding:6px 12px;border-radius:14px;box-shadow:var(--shadow);white-space:nowrap;pointer-events:none;z-index:1}
 #say::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--paper);border-bottom-width:0}
 #map{cursor:pointer}#map.big{left:50%;bottom:50%;transform:translate(-50%,50%);z-index:4}
@@ -93,7 +94,44 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #chat{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(420px,calc(100vw - 130px));display:none;gap:6px;align-items:center;background:var(--paper);padding:5px 5px 5px 14px;border-radius:999px;box-shadow:var(--shadow);z-index:4;box-sizing:border-box}
 #chat input{flex:1;min-width:0;border:0;background:none;outline:none;font:600 16px var(--body);color:var(--ink);padding:6px 0;-webkit-user-select:text;user-select:text}
 #chat .round{width:34px;height:34px;font-size:16px;box-shadow:none;background:var(--sun);color:#fff}
-#chat .round.x{background:var(--paper-2);color:var(--ink)}
+#chat .round.x,#chat .round.em{background:var(--paper-2);color:var(--ink)}
+/* animated emoji: small SVGs whose faces really smile, cry, laugh... (they stand still for people who ask for less motion) */
+.ae{display:inline-block;width:1.45em;height:1.45em;vertical-align:-.35em;margin:0 .06em;line-height:1}
+.ae svg{width:100%;height:100%;overflow:visible;display:block}.ae svg *{transform-box:fill-box;transform-origin:center}
+.ae .mouth{transform-origin:50% 0}
+.ae-smile .face{animation:aeBob 1.6s ease-in-out infinite}.ae-smile .eyes{animation:aeBlink 3.4s infinite}.ae-smile .mouth{animation:aeGrin 1.6s ease-in-out infinite}
+.ae-laugh .face{animation:aeShake .24s ease-in-out infinite alternate}.ae-laugh .mouth{animation:aeGrin .32s ease-in-out infinite}.ae-laugh .tl{animation:aeFlickL .7s ease-out infinite}.ae-laugh .tr{animation:aeFlickR .7s ease-out infinite}
+.ae-cry .face{animation:aeShiver .5s ease-in-out infinite alternate}.ae-cry .mouth{animation:aeWobble .5s ease-in-out infinite alternate}.ae-cry .tear{animation:aeTear 1.3s ease-in infinite}.ae-cry .t2{animation-delay:.65s}
+.ae-love .face{animation:aeBob 1.4s ease-in-out infinite}.ae-love .he{animation:aeBeat 1s ease-in-out infinite}.ae-love .up{animation:aeRise 2s ease-out infinite}.ae-love .u2{animation-delay:1s}
+.ae-sleep .face{animation:aeBreath 2.8s ease-in-out infinite}.ae-sleep .mouth{animation:aeBreath 2.8s ease-in-out infinite reverse}.ae-sleep .z{animation:aeZ 2.6s ease-out infinite}.ae-sleep .z2{animation-delay:1.3s}
+.ae-wow .face{animation:aePop 1.2s ease-in-out infinite}.ae-wow .eyes{animation:aeWiden 1.2s ease-in-out infinite}.ae-wow .mouth{animation:aeO 1.2s ease-in-out infinite}
+.ae-thumb .thumb{transform-origin:20% 90%;animation:aeThumb 1.1s ease-in-out infinite}
+.ae-heart .beat{animation:aeHeart 1.2s ease-in-out infinite}
+@keyframes aeBob{50%{transform:translateY(-1.3px)}}
+@keyframes aeBlink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes aeGrin{0%,100%{transform:scaleY(.5) scaleX(.96)}50%{transform:scaleY(1) scaleX(1.05)}}
+@keyframes aeShake{from{transform:rotate(-7deg) translateY(0)}to{transform:rotate(7deg) translateY(-.8px)}}
+@keyframes aeFlickL{0%{transform:translate(0,0);opacity:0}25%{opacity:1}100%{transform:translate(-6px,-5px);opacity:0}}
+@keyframes aeFlickR{0%{transform:translate(0,0);opacity:0}25%{opacity:1}100%{transform:translate(6px,-5px);opacity:0}}
+@keyframes aeShiver{from{transform:translateX(-.5px)}to{transform:translateX(.5px)}}
+@keyframes aeWobble{from{transform:scaleX(.9) translateY(0)}to{transform:scaleX(1.08) translateY(.7px)}}
+@keyframes aeTear{0%{transform:translateY(0) scale(.5);opacity:0}15%{transform:translateY(1px) scale(1);opacity:1}100%{transform:translateY(12px) scale(1);opacity:0}}
+@keyframes aeBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.28)}}
+@keyframes aeRise{0%{transform:translateY(0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translateY(-13px) scale(1.1);opacity:0}}
+@keyframes aeBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes aeZ{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translate(5px,-12px) scale(1.25);opacity:0}}
+@keyframes aePop{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes aeWiden{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
+@keyframes aeO{0%,100%{transform:scale(.85)}50%{transform:scale(1.2)}}
+@keyframes aeThumb{0%,100%{transform:translateY(0) rotate(0)}40%{transform:translateY(-3px) rotate(-9deg)}}
+@keyframes aeHeart{0%,70%,100%{transform:scale(1)}14%{transform:scale(1.2)}28%{transform:scale(1)}42%{transform:scale(1.14)}}
+@media (prefers-reduced-motion:reduce){.ae svg *{animation:none!important}}
+#emopick{position:absolute;right:0;top:calc(100% + 6px);background:var(--paper);border-radius:16px;box-shadow:var(--shadow);padding:6px;display:none;grid-template-columns:repeat(4,1fr);gap:2px}
+#emopick.on{display:grid}
+#emopick button{width:46px;height:46px;border:0;background:none;border-radius:12px;cursor:pointer;padding:7px;display:grid;place-items:center}
+#emopick button:hover,#emopick button:focus-visible{background:var(--paper-2)}
+#emopick .ae{width:30px;height:30px;margin:0;vertical-align:0}
+#ostat{display:flex;flex-direction:column;gap:5px;padding:8px 6px 2px;margin-top:4px;border-top:2px solid var(--paper-2)}
 #toasts{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:3;pointer-events:none;width:min(440px,calc(100vw - 130px))}
 .toast{background:var(--paper);color:var(--ink);font:600 14px/1.35 var(--body);padding:7px 14px;border-radius:16px;box-shadow:var(--shadow);max-width:100%;overflow-wrap:anywhere;animation:tin .25s ease-out;transition:opacity .6s}
 .toast b{font-family:var(--display);color:var(--sun);margin-right:6px}
@@ -229,6 +267,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
       <div class="pane" id="p_face" role="tabpanel" aria-labelledby="t_face"><div class="lbl">Skin tone</div><div class="sws" id="swskin"></div><div class="lbl">Face</div><div class="chips" id="chface"></div></div>
       <div class="pane" id="p_hair" role="tabpanel" aria-labelledby="t_hair"><div class="lbl">Hair colour</div><div class="sws" id="swhair"></div><div class="lbl">Hair style</div><div class="chips" id="chhair"></div></div>
       <div class="pane" id="p_out" role="tabpanel" aria-labelledby="t_out"><div id="oflist"></div></div></div></div>
+  <div id="ostat"><div class="lbl">Status</div><div class="chips" id="chstat"></div></div>
   <div id="onames"><label id="mnl">Your name<input id="myname" maxlength="16" autocomplete="off" spellcheck="false"></label>
   <label id="fnl">Friend's name<input id="fname" maxlength="16" autocomplete="off" spellcheck="false"></label></div></div>
 <div id="tagP" class="tag"></div><div id="tagN" class="tag tagn" title="Tap to rename"></div><div id="tagD" class="tag"></div><div id="say"></div><div id="mysay"></div>
@@ -267,7 +306,7 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
  <div id="gnote">Your photos and videos stay private to your account.</div>
 </div></div>
 
-<div id="chat"><input id="chatin" maxlength="80" placeholder="Say something to everyone here…" autocomplete="off" enterkeyhint="send" aria-label="Message"><button type="button" class="round" id="chatgo" aria-label="Send">➤</button><button type="button" class="round x" id="chatx" aria-label="Close">✕</button></div>
+<div id="chat"><input id="chatin" maxlength="80" placeholder="Say something to everyone here…" autocomplete="off" enterkeyhint="send" aria-label="Message"><button type="button" class="round em" id="chatem" aria-label="Emoji" aria-haspopup="true" aria-expanded="false">🙂</button><button type="button" class="round" id="chatgo" aria-label="Send">➤</button><button type="button" class="round x" id="chatx" aria-label="Close">✕</button><div id="emopick" role="group" aria-label="Emoji"></div></div>
 <canvas id="map" width="280" height="280"></canvas>
 <div id="zoom"><button class="round" id="zi" aria-label="Zoom in">+</button><button class="round" id="zo" aria-label="Zoom out">−</button></div>
 <div id="panel"><div id="card"><div id="hd"><h2 id="t"></h2><span><button class="ib" id="mx" title="Maximize" aria-label="Maximize">⤢</button><button class="ib" id="x" title="Close" aria-label="Close">✕</button></span></div><p id="d"></p><div id="viewer"><button class="nv" id="pv" aria-label="Previous">‹</button><div id="media"></div><button class="nv" id="nx" aria-label="Next">›</button><div id="mact"><button type="button" class="ma" id="macc" hidden></button><button type="button" class="ma" id="madd">📷 Add photo/video</button><button type="button" class="ma" id="mdel" aria-label="Remove photo or video" title="Remove">🗑</button></div><div id="mmsg" role="status"></div></div><div id="cap"></div><div id="thumbs"></div></div></div>
@@ -2534,6 +2573,9 @@ const PV=(()=>{const cv=$('pv'),wrap=$('pvw');let R,sc,cam,rig,run=0,last=0,yaw=
   return{start(){if(!init())return;if(pend){dress(rig,pend);showHat(rig,hatOn)}if(!run){last=performance.now();run=requestAnimationFrame(loop)}},
     show(c){pend=c;if(R){dress(rig,c);showHat(rig,hatOn)}},
     focus(n){hatOn=n!=='hair';if(R)showHat(rig,hatOn);to=n==='out'?{y:1.95,d:9.8}:n==='hair'?{y:2.85,d:8.4}:{y:2.85,d:6.6}}}})();   // (the hat comes off while you pick a hair style, so you can see it)
+/* status: how you are right now, shown beside your name for everyone (not remembered between visits: you are active whenever you arrive) */
+const STATUS=[['Active','🟢'],['AFK','🕒'],['Asleep','💤'],['Working','💻']];let MYST=0;
+function setTag(el,name,st){el.textContent='';el.appendChild(document.createTextNode(name));const b=document.createElement('span');b.className=st?'sb':'sb dot';if(st)b.textContent=STATUS[st][1]+' '+STATUS[st][0];else b.title='Active';el.appendChild(b)}
 const GRP={};   // key -> its buttons, so the one you are wearing can be marked
 function setLook(key,i){const c=PPL[ctl];if(c[key]===i)return;c[key]=i;dress(me,c);saveLook(ctl);refreshPeople()}
 const mkBtn=(cls,box)=>{const b=document.createElement('button');b.type='button';b.className=cls;box.appendChild(b);return b};
@@ -2542,33 +2584,60 @@ const chips=(box,key,names)=>GRP[key]=names.map((n,i)=>{const b=mkBtn('chip',box
 swatches($('swskin'),'skin',SKINS);chips($('chface'),'face',FACES.map(f=>f.n));swatches($('swhair'),'hcol',HAIRC);chips($('chhair'),'hair',HAIRS.map(h=>h.n));
 GRP.outfit=OUT.map((o,i)=>{const b=mkBtn('of',ofl);b.innerHTML='<b></b><span></span><i></i>';b.children[0].textContent=o.ic;b.children[1].textContent=o.n;
   b.children[2].style.background='linear-gradient('+hex6(o.top.c)+' 50%,'+hex6(o.bot.c!=null?o.bot.c:o.top.c)+' 50%)';b.onclick=()=>setLook('outfit',i);return b});
+const stBtns=STATUS.map((s,i)=>{const b=mkBtn('chip',$('chstat'));b.textContent=s[1]+' '+s[0];b.onclick=()=>{MYST=i;refreshPeople()};return b});
 const TABS=['face','hair','out'];
 function tab(n){TABS.forEach(t=>{const on=t===n;$('t_'+t).classList.toggle('on',on);$('t_'+t).setAttribute('aria-selected',on);$('p_'+t).classList.toggle('on',on)});PV.focus(n)}
 TABS.forEach(t=>$('t_'+t).onclick=()=>tab(t));tab('out');
 function refreshPeople(){const c=PPL[ctl];Object.keys(GRP).forEach(k=>GRP[k].forEach((b,i)=>{const on=i===c[k];b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)}));
+  stBtns.forEach((b,i)=>{b.classList.toggle('on',i===MYST);b.setAttribute('aria-pressed',i===MYST)});
   $('who').textContent='Playing as '+c.name;$('swap').textContent='👫 Be '+PPL[1-ctl].name;PV.show(c);
-  if(document.activeElement!==fname)fname.value=PPL[1].name;if(document.activeElement!==myname)myname.value=PPL[0].name;tagP.textContent=c.name;tagN.textContent=PPL[1-ctl].name;$('bo').title='Character: look, outfit, swap, names'}
+  if(document.activeElement!==fname)fname.value=PPL[1].name;if(document.activeElement!==myname)myname.value=PPL[0].name;setTag(tagP,c.name,MYST);tagN.textContent=PPL[1-ctl].name;$('bo').title='Character: look, outfit, swap, names'}
 $('bo').onclick=()=>{of.style.display=of.style.display==='flex'?'none':'flex';if(of.style.display==='flex')PV.start()};
 $('swap').onclick=swapPeople;
 // ---- chat: send-only. Messages go to everyone who has the world open right now (nothing is stored or listed).
 // The sender sees a speech bubble over their character; everyone else gets a short-lived toast.
 const chatEl=$('chat'),chatIn=$('chatin'),toasts=$('toasts'),mySay=$('mysay');let room=null,mySayUntil=0,lastSend=0;
 const clean=v=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g,'').replace(/\s+/g,' ').trim();
-function toast(name,text,sys){const d=document.createElement('div');d.className='toast';if(name){const b=document.createElement('b');b.textContent=name;d.appendChild(b)}d.appendChild(document.createTextNode(text));toasts.appendChild(d);
+/* animated emoji. A message carries ordinary emoji characters (so anyone, on any version, can read it); on screen the few we have drawings for come to life.
+   The drawings are our own small SVGs, never built from message text, so a message can't inject anything. */
+const EMOSVG={
+ smile:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><g class="eyes"><ellipse cx="11" cy="13" rx="1.9" ry="2.7" fill="#2d2a35"/><ellipse cx="21" cy="13" rx="1.9" ry="2.7" fill="#2d2a35"/></g><ellipse cx="7" cy="19" rx="2.4" ry="1.5" fill="#ff8f9a" opacity=".55"/><ellipse cx="25" cy="19" rx="2.4" ry="1.5" fill="#ff8f9a" opacity=".55"/><path class="mouth" d="M8.5 18.2 Q16 28 23.5 18.2 Z" fill="#7a2e33" stroke="#7a2e33" stroke-width="1.2" stroke-linejoin="round"/></g>',
+ laugh:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><path d="M7.5 14.5 Q11 9.5 14.5 14.5" fill="none" stroke="#2d2a35" stroke-width="2" stroke-linecap="round"/><path d="M17.5 14.5 Q21 9.5 24.5 14.5" fill="none" stroke="#2d2a35" stroke-width="2" stroke-linecap="round"/><path class="mouth" d="M7 18 Q16 31 25 18 Z" fill="#7a2e33" stroke="#7a2e33" stroke-width="1.2" stroke-linejoin="round"/></g><g class="tl"><path transform="translate(4.5 15)" d="M0 -2.4 C1.8 .2 2.2 1.8 0 2.8 C-2.2 1.8 -1.8 .2 0 -2.4Z" fill="#5bb8ff"/></g><g class="tr"><path transform="translate(27.5 15)" d="M0 -2.4 C1.8 .2 2.2 1.8 0 2.8 C-2.2 1.8 -1.8 .2 0 -2.4Z" fill="#5bb8ff"/></g>',
+ cry:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><path d="M6.5 11.8 L12.5 9.6 M25.5 11.8 L19.5 9.6" stroke="#2d2a35" stroke-width="1.6" stroke-linecap="round"/><ellipse cx="11" cy="14.5" rx="1.9" ry="2.5" fill="#2d2a35"/><ellipse cx="21" cy="14.5" rx="1.9" ry="2.5" fill="#2d2a35"/><circle cx="11.7" cy="13.6" r=".7" fill="#fff"/><circle cx="21.7" cy="13.6" r=".7" fill="#fff"/><path class="mouth" d="M10.5 24.5 Q16 19.5 21.5 24.5" fill="none" stroke="#7a2e33" stroke-width="2" stroke-linecap="round"/></g><g class="tear t1"><path transform="translate(10.5 18.5)" d="M0 -3 C2.2 .2 2.6 2.2 0 3.2 C-2.6 2.2 -2.2 .2 0 -3Z" fill="#5bb8ff" stroke="#3a9be0" stroke-width=".5"/></g><g class="tear t2"><path transform="translate(21.5 18.5)" d="M0 -3 C2.2 .2 2.6 2.2 0 3.2 C-2.6 2.2 -2.2 .2 0 -3Z" fill="#5bb8ff" stroke="#3a9be0" stroke-width=".5"/></g>',
+ love:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><g class="he"><path transform="translate(11 13.5) scale(.62)" d="M0 4.5 C-7 -.5 -4.2 -6.2 0 -2.6 C4.2 -6.2 7 -.5 0 4.5Z" fill="#ff3d63"/></g><g class="he"><path transform="translate(21 13.5) scale(.62)" d="M0 4.5 C-7 -.5 -4.2 -6.2 0 -2.6 C4.2 -6.2 7 -.5 0 4.5Z" fill="#ff3d63"/></g><path d="M10 20 Q16 26.5 22 20" fill="none" stroke="#7a2e33" stroke-width="2" stroke-linecap="round"/></g><g class="up u1"><path transform="translate(25 6) scale(.42)" d="M0 4.5 C-7 -.5 -4.2 -6.2 0 -2.6 C4.2 -6.2 7 -.5 0 4.5Z" fill="#ff5c7c"/></g><g class="up u2"><path transform="translate(7 5) scale(.34)" d="M0 4.5 C-7 -.5 -4.2 -6.2 0 -2.6 C4.2 -6.2 7 -.5 0 4.5Z" fill="#ff8fa6"/></g>',
+ wow:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><path d="M6.5 8.5 Q10 5.5 13.5 7.5 M18.5 7.5 Q22 5.5 25.5 8.5" fill="none" stroke="#2d2a35" stroke-width="1.6" stroke-linecap="round"/><g class="eyes"><circle cx="11" cy="14" r="3.5" fill="#fff" stroke="#2d2a35" stroke-width="1"/><circle cx="11" cy="14" r="1.5" fill="#2d2a35"/><circle cx="21" cy="14" r="3.5" fill="#fff" stroke="#2d2a35" stroke-width="1"/><circle cx="21" cy="14" r="1.5" fill="#2d2a35"/></g><ellipse class="mouth" cx="16" cy="23" rx="3" ry="4" fill="#7a2e33"/></g>',
+ sleep:'<g class="face"><circle cx="16" cy="16" r="14" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.2"/><path d="M7.5 14 Q11 17.5 14.5 14 M17.5 14 Q21 17.5 24.5 14" fill="none" stroke="#2d2a35" stroke-width="2" stroke-linecap="round"/><ellipse class="mouth" cx="16" cy="22.5" rx="2" ry="1.7" fill="#7a2e33"/></g><text class="z z1" x="22" y="9" font-size="9" font-weight="800" fill="#6a7bd6" font-family="Fredoka,Nunito,sans-serif">z</text><text class="z z2" x="26" y="4.5" font-size="6.5" font-weight="800" fill="#8a97e6" font-family="Fredoka,Nunito,sans-serif">z</text>',
+ thumb:'<g class="thumb"><path d="M12 14 L16.5 6 Q18 3.5 20.2 4.6 Q22.2 5.8 21.2 8.6 L19.6 13 H26 Q29.5 13 28.8 16.5 L27.2 25.5 Q26.6 28.5 23.5 28.5 H12 Z" fill="#ffd34d" stroke="#e5a52a" stroke-width="1.4" stroke-linejoin="round"/><path d="M13 19.2 H25.8 M13 23.8 H25" stroke="#e5a52a" stroke-width="1.2" stroke-linecap="round"/><rect x="3" y="13" width="7.5" height="16" rx="2" fill="#6aa7ff" stroke="#3d78d6" stroke-width="1.2"/></g>',
+ heart:'<g class="beat"><path d="M16 28 C3 19 5 6.5 12.2 7 C14.2 7.2 15.5 8.5 16 10 C16.5 8.5 17.8 7.2 19.8 7 C27 6.5 29 19 16 28Z" fill="#ff4d6d" stroke="#d92f52" stroke-width="1.2" stroke-linejoin="round"/><path d="M9.5 11.5 Q10.5 9.5 12.5 9.8" stroke="#fff" opacity=".55" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>'};
+const EMONAME={smile:'Smile',laugh:'Laugh',cry:'Cry',love:'Love',wow:'Wow',sleep:'Sleepy',thumb:'Thumbs up',heart:'Heart'},EMOCH={smile:'😀',laugh:'😂',cry:'😢',love:'😍',wow:'😮',sleep:'😴',thumb:'👍',heart:'❤️'};
+const EMOKEY={'😀':'smile','😂':'laugh','😢':'cry','😍':'love','😮':'wow','😴':'sleep','👍':'thumb','❤️':'heart','❤':'heart'},EMORE=/😀|😂|😢|😍|😮|😴|👍|❤️?/gu;
+function emoEl(k){const e=document.createElement('span');e.className='ae ae-'+k;e.setAttribute('role','img');e.setAttribute('aria-label',EMONAME[k]);e.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true">'+EMOSVG[k]+'</svg>';return e}
+// put text into an element, the emoji we know replaced by their animated drawings (everything else stays plain text)
+function rich(el,text,keep){if(!keep)el.textContent='';let i=0;for(const m of text.matchAll(EMORE)){if(m.index>i)el.appendChild(document.createTextNode(text.slice(i,m.index)));el.appendChild(emoEl(EMOKEY[m[0]]));i=m.index+m[0].length}
+  if(i<text.length)el.appendChild(document.createTextNode(text.slice(i)))}
+function toast(name,text,sys){const d=document.createElement('div');d.className='toast';if(name){const b=document.createElement('b');b.textContent=name;d.appendChild(b)}rich(d,text,true);toasts.appendChild(d);
   while(toasts.children.length>3)toasts.firstChild.remove();setTimeout(()=>d.classList.add('old'),sys?3200:6500);setTimeout(()=>d.remove(),sys?3900:7200)}
 function openChat(){if(!room||open)return;of.style.display='none';chatEl.style.display='flex';clearInput();chatIn.focus()}
-function closeChat(){chatEl.style.display='none';chatIn.blur();clearInput();cv.focus()}
+function closeChat(){chatEl.style.display='none';emoShow(false);chatIn.blur();clearInput();cv.focus()}
+// the emoji picker: a few animated ones, tap to add to your message
+const emoPick=$('emopick'),emoBtn=$('chatem');
+function emoShow(on){emoPick.classList.toggle('on',on);emoBtn.setAttribute('aria-expanded',on)}
+Object.keys(EMOSVG).forEach(k=>{const b=document.createElement('button');b.type='button';b.setAttribute('aria-label',EMONAME[k]);b.title=EMONAME[k];b.appendChild(emoEl(k));
+  b.onclick=()=>{const v=chatIn.value,a=chatIn.selectionStart==null?v.length:chatIn.selectionStart,z=chatIn.selectionEnd==null?a:chatIn.selectionEnd,n=(v.slice(0,a)+EMOCH[k]+v.slice(z)).slice(0,80);
+    chatIn.value=n;const c=Math.min(a+EMOCH[k].length,n.length);chatIn.focus();try{chatIn.setSelectionRange(c,c)}catch(_){}emoShow(false)};emoPick.appendChild(b)});
+emoBtn.onclick=()=>{emoShow(!emoPick.classList.contains('on'));chatIn.focus()};
+addEventListener('pointerdown',e=>{if(emoPick.classList.contains('on')&&!emoPick.contains(e.target)&&e.target!==emoBtn)emoShow(false)},true);
 function sendChat(){const t=clean(chatIn.value).slice(0,80);if(!t||!room)return;
   if(performance.now()-lastSend<1200)return;
   if(!room.connected()){toast('','Not connected yet - try again in a moment',true);return}
   lastSend=performance.now();chatIn.value='';
-  room.emit('chat',{n:clean(PPL[ctl].name).slice(0,16),t,u:MP.key()}).then(()=>{mySay.textContent=t;mySayUntil=performance.now()+4500},
+  room.emit('chat',{n:clean(PPL[ctl].name).slice(0,16),t,u:MP.key()}).then(()=>{rich(mySay,t);mySayUntil=performance.now()+4500},
     e=>toast('',e&&e.code==='not_permitted'?'Viewers can\'t send messages here':'Message didn\'t go through',true));
   closeChat()}
 $('bchat').onclick=()=>chatEl.style.display==='flex'?closeChat():openChat();
 cv.addEventListener('pointerdown',()=>{if(chatEl.style.display==='flex'&&!chatIn.value.trim())closeChat()});
 $('chatgo').onclick=sendChat;$('chatx').onclick=closeChat;
-chatIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape')closeChat()});
+chatIn.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape'){if(emoPick.classList.contains('on'))emoShow(false);else closeChat()}});
 let roomHooked=null;
 function useRoom(r){room=r;$('bchat').hidden=false;if(roomHooked===r)return;roomHooked=r;
   r.on('chat',m=>{if(m.isMe&&m.sameTab)return;const d=m.data;if(!d||typeof d.t!=='string')return;const t=clean(d.t).slice(0,80);if(!t)return;if(typeof d.u==='string')MP.say(d.u,t);toast(clean(d.n).slice(0,16)||'Someone',t)});
@@ -3198,7 +3267,7 @@ function dropRemote(R){R.rig.root.visible=false;showBike(R,-1);standPose(R.rig);
 function onSync(st){const seen=new Set();
   for(const k in st){if(k===myKey)continue;const arr=st[k],e=arr&&arr[arr.length-1];if(!e||typeof e!=='object')continue;
     const R=remotes.get(k)||addRemote(k);if(!R)continue;seen.add(k);
-    R.tag.textContent=clean(e.n).slice(0,16)||'Someone';
+    setTag(R.tag,clean(e.n).slice(0,16)||'Someone',(e.u|0)>0&&(e.u|0)<STATUS.length?e.u|0:0);   // (anything unknown counts as active)
     const lk=unpackLook(e.a,e.o),sg=packLook(lk).join();if(sg!==R.lk){R.lk=sg;dress(R.rig,lk)}
     R.b=Number.isInteger(e.b)&&e.b>=0&&e.b<PARKED.length?e.b:-1;R.bt=+e.bt||0;
     R.s=Number.isInteger(e.s)&&e.s>=-1&&e.s<SEATS.length?e.s:null;R.st=+e.st||0;
@@ -3234,7 +3303,7 @@ function bikeChanged(){const now=Date.now();
 const seatNow=()=>!sitting?null:sitting.kind==='ground'&&!SEATS.includes(sitting)?-1:SEATS.indexOf(sitting);
 function pushState(force){const now=performance.now();if(!on)return;
   const gap=force?120:500;if(now-lastTrack<gap){dueMin=trackDue?Math.min(dueMin,gap):gap;trackDue=true;return}
-  lastTrack=now;trackDue=false;dueMin=500;const p=PPL[ctl];WS.track({n:clean(p.name).slice(0,16)||'Someone',a:packLook(p),b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
+  lastTrack=now;trackDue=false;dueMin=500;const p=PPL[ctl];WS.track({n:clean(p.name).slice(0,16)||'Someone',a:packLook(p),u:MYST,b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
 function sendPos(force,mv){const now=performance.now();lastSend=now;sent.m=mv;sent.r=P.rotation.y;
   WS.send('p',{k:myKey,x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+P.rotation.y.toFixed(2),m:mv})}
 WS.on('p',d=>{if(!d||typeof d.k!=='string'||d.k===myKey)return;const R=remotes.get(d.k);if(!R)return;
@@ -3256,7 +3325,7 @@ const sOf=R=>R.s!=null?(R.s>=0?SEATS[R.s]:{kind:'ground'}):null;
 function tick(dt,t){
   if(on){
     const sn=seatNow();if(sn!==my.s){my.s=sn;my.st=Date.now()}
-    const p=PPL[ctl],sig=clean(p.name)+'|'+packLook(p).join()+'|'+my.s+'|'+my.b;
+    const p=PPL[ctl],sig=clean(p.name)+'|'+packLook(p).join()+'|'+MYST+'|'+my.s+'|'+my.b;
     if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
     acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
       if(remotes.size&&(mv||mv!==sent.m||Math.abs(P.rotation.y-sent.r)>.05||performance.now()-lastSend>20000))sendPos(false,mv)}}   // alone in the world: nothing is sent at all
@@ -3278,7 +3347,7 @@ function tick(dt,t){
 function tags(){remotes.forEach(R=>{const q=R.rig.root.position;
   if(R.has&&!open)tagAt(R.tag,q.x,q.y,q.z,8,70);else R.tag.style.display='none';
   if(R.has&&!open&&R.sayUntil>performance.now())tagAt(R.say,q.x,q.y+4.4,q.z,-8,70,true);else if(R.say.style.display!=='none')R.say.style.display='none'})}
-return{key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){R.say.textContent=text;R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
+return{key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){rich(R.say,text);R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
 /*MP-END*/
 
 const clockT=new THREE.Clock();let t=0,walkPh=0,walkAmt=0,frames=0,lift=0,lastStep=0;
