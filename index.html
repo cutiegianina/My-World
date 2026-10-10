@@ -1773,12 +1773,17 @@ function poolTick(night){const p=P.position;for(const q of LSRC)q.dd=q.p.distanc
 
 /* =========================== SKY =========================== */
 // gradient dome with sun glow
-const domeU={uTop:{value:new THREE.Color()},uHor:{value:new THREE.Color()},uBot:{value:new THREE.Color()},uSun:{value:new THREE.Vector3(0,1,0)},uGlow:{value:new THREE.Color()}};
+const domeU={uTop:{value:new THREE.Color()},uHor:{value:new THREE.Color()},uBot:{value:new THREE.Color()},uSun:{value:new THREE.Vector3(0,1,0)},uGlow:{value:new THREE.Color()},
+  uRed:{value:new THREE.Color('#ff4a22')},uPink:{value:new THREE.Color('#cf93aa')},uDusk:{value:0}};   // uDusk: how much of a sunset (or sunrise) it is, 0..1
 const dome=new THREE.Mesh(new THREE.SphereGeometry(500,32,16),new THREE.ShaderMaterial({uniforms:domeU,side:THREE.BackSide,depthWrite:false,
   vertexShader:`varying vec3 vD;void main(){vD=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-  fragmentShader:`uniform vec3 uTop,uHor,uBot,uSun,uGlow;varying vec3 vD;
+  fragmentShader:`uniform vec3 uTop,uHor,uBot,uSun,uGlow,uRed,uPink;uniform float uDusk;varying vec3 vD;
     void main(){vec3 d=normalize(vD);float h=d.y;vec3 c=h>0.?mix(uHor,uTop,pow(clamp(h,0.,1.),.5)):mix(uHor,uBot,clamp(-h*4.,0.,1.));
-      float s=max(dot(d,uSun),0.);c+=uGlow*(pow(s,5.)*.32+pow(s,48.)*.5);gl_FragColor=vec4(c,1.);}`}));
+      // a sunset: red hugging the horizon on the sun's side, melting up through orange into the sky; on the far side a rose band over the shadow of the earth
+      float az=dot(normalize(d.xz+1e-5),normalize(uSun.xz+1e-5))*.5+.5,hh=max(h,0.),dn=1.-clamp(-h*6.,0.,1.);
+      c=mix(c,mix(uRed,uHor,smoothstep(0.,.3,hh)),uDusk*pow(az,2.2)*(1.-smoothstep(0.,.5,hh))*dn);
+      c=mix(c,mix(uPink,c,smoothstep(0.,.4,hh)),uDusk*pow(1.-az,1.4)*.65*(1.-smoothstep(0.,.42,hh))*dn);
+      float s=max(dot(d,uSun),0.);c+=uGlow*(pow(s,5.)*.32+pow(s,48.)*.5)+uRed*pow(s,14.)*uDusk*.55;gl_FragColor=vec4(c,1.);}`}));
 dome.renderOrder=-10;dome.frustumCulled=false;W.add(dome);
 
 // real star sky: true RA/Dec positions (J2000), rotated by sidereal time for an observer at latitude LAT
@@ -1827,8 +1832,11 @@ function glowSprite(c,s){const k=document.createElement('canvas');k.width=k.heig
   const t=new THREE.CanvasTexture(k);t.colorSpace=THREE.SRGBColorSpace;const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,fog:false}));sp.scale.set(s,s,1);return sp}
 const sunG=new THREE.Group(),moonG=new THREE.Group();
 sunG.add(new THREE.Mesh(new THREE.SphereGeometry(6,24,16),new THREE.MeshBasicMaterial({color:new THREE.Color(7,6,4.2),fog:false})),glowSprite('rgba(255,214,140,.55)',60));
+const HORIZON=new THREE.Plane(new THREE.Vector3(0,1,0),0);R.localClippingEnabled=true;   // the sea level: nothing of the sun or moon is drawn below it
 moonG.add(new THREE.Mesh(new THREE.SphereGeometry(4.5,24,16),new THREE.MeshBasicMaterial({color:new THREE.Color(1.7,1.7,1.6),map:tex('rock',1,1),fog:false})),glowSprite('rgba(170,190,255,.45)',30));
 sunG.renderOrder=moonG.renderOrder=-3;W.add(sunG,moonG);
+[sunG,moonG].forEach(g=>g.children.forEach(o=>{o.material.clippingPlanes=[HORIZON]}));
+const SUNDISC=sunG.children[0].material,SUNGLOW=sunG.children[1],MOONGLOW=moonG.children[1];
 
 // clouds: faceted puffs lit by the sun, shaded with sky colour, fading out at night
 const cloudU={uLit:{value:new THREE.Color()},uShade:{value:new THREE.Color()},uSun:{value:new THREE.Vector3(0,1,0)},uOp:{value:.95},fogColor:{value:W.fog.color},fogNear:{value:80},fogFar:{value:280}};
@@ -2618,13 +2626,17 @@ $('bg').onclick=()=>{pitch=pitch<0?.72:-1.15;yaw=Math.PI};
 $('bd').onclick=()=>{dayI=(dayI+1)%13;$('bd').title=dayI?'Sky for mid-'+MON[dayI-1]+' - tap for next month':'Sky for today - tap to step through the months'};
 // local sidereal time = (day-of-year offset from the March equinox) + (local solar time - 12h)
 function skyRot(h){const doy=curDoy(),th=(((doy-80)*24/365.25+(h-12))%24+24)%24*Math.PI/12,f=LAT*Math.PI/180,sn=Math.sin(th),cs=Math.cos(th),sf=Math.sin(f),cf=Math.cos(f);
-  sky.matrix.set(-sn,cs,0,P.position.x, cf*cs,cf*sn,sf,0, sf*cs,sf*sn,-cf,P.position.z, 0,0,0,1);/* north celestial pole toward -z */sky.matrixWorldNeedsUpdate=true}
+  sky.matrix.set(-sn,cs,0,cam.position.x, cf*cs,cf*sn,sf,cam.position.y, sf*cs,sf*sn,-cf,cam.position.z, 0,0,0,1);/* north celestial pole toward -z */sky.matrixWorldNeedsUpdate=true}
 // sky palette keyed by sun elevation: [elevation, zenith, horizon]
-const PAL=[[-.4,'#05081a','#0d1534'],[-.16,'#0b1236','#1d2552'],[-.05,'#25336e','#c8705e'],[.03,'#4673bd','#ffad78'],[.12,'#5b9be0','#ffd6aa'],[.3,'#4a95e3','#bfe3f6'],[.9,'#3f8ce4','#b7e0f5']].map(([e,a,b])=>[e,new THREE.Color(a),new THREE.Color(b)]);
+const PAL=[[-.4,'#05081a','#0d1534'],[-.16,'#0b1236','#1d2552'],[-.09,'#1c2a68','#6a3f72'],[-.03,'#2c3f86','#d4584c'],[.03,'#3f6cb8','#ff8545'],[.1,'#5790d8','#ffb878'],[.2,'#5498e0','#ffddb0'],[.3,'#4a95e3','#cfe6f4'],[.9,'#3f8ce4','#b7e0f5']].map(([e,a,b])=>[e,new THREE.Color(a),new THREE.Color(b)]);
 const cTop=new THREE.Color(),cHor=new THREE.Color(),cTmp=new THREE.Color(),sdir=new THREE.Vector3(),ldir=new THREE.Vector3();
-const SUNW=new THREE.Color('#fff1dc'),SUNO=new THREE.Color('#ff9a52'),MOONC=new THREE.Color('#9db4ff'),HGND=new THREE.Color('#77805a'),CLOUDW=new THREE.Color('#ffffff'),CLOUDP=new THREE.Color('#ffb48a');
+const SUNW=new THREE.Color('#fff1dc'),SUNO=new THREE.Color('#ff9a52'),MOONC=new THREE.Color('#9db4ff'),HGND=new THREE.Color('#77805a'),CLOUDW=new THREE.Color('#ffffff'),CLOUDP=new THREE.Color('#ff9a72'),CLOUDV=new THREE.Color('#9b7aa8'),SUNR=new THREE.Color('#ff5f2a'),FOGD=new THREE.Color('#c98a86'),
+  SD0=new THREE.Color(1.1,.1,.02),SD1=new THREE.Color(1.5,.55,.12),SD2=new THREE.Color(2.6,1.6,.6),SD3=new THREE.Color(7,6,4.2);   // the sun's disc: red at the horizon, then orange, gold, and the white-cream of midday (kept low enough near the horizon that tone mapping doesn't wash the colour out)
 function palette(ey){for(let i=1;i<PAL.length;i++){if(ey<=PAL[i][0]||i===PAL.length-1){const[a,b]=[PAL[i-1],PAL[i]],t=clamp((ey-a[0])/(b[0]-a[0]),0,1);cTop.copy(a[1]).lerp(b[1],t);cHor.copy(a[2]).lerp(b[2],t);return}}}
-const placeDir=(o,d,s)=>{o.visible=d.y>-.06;o.position.set(P.position.x+d.x*160*s,d.y*160*s,P.position.z+d.z*160*s)};
+// sun, moon and stars hang off the camera like the dome does, so from a hilltop they are at their true height (not sunk towards the sea), and none of it is drawn below the horizon
+const placeDir=(o,d,s)=>{o.visible=d.y>-.06-clamp(cam.position.y/500,0,.4);o.position.set(cam.position.x+d.x*160*s,cam.position.y+d.y*160*s,cam.position.z+d.z*160*s)};
+const SUNDIR=new THREE.Vector3(0,1,0),MOONDIR=new THREE.Vector3(0,-1,0);
+function anchorSky(){skyRot(simH);placeDir(sunG,SUNDIR,1);placeDir(moonG,MOONDIR,1);const dip=clamp(cam.position.y/500,0,.4);HORIZON.constant=-(cam.position.y-160*dip)}   // (the horizon you see from up high is a little below eye level)
 /* ---- shooting stars + meteor showers: a small pool of glowing point-trails in the night sky ----
    normal nights: one every ~25-50 s.  About 1 night in 4 is a shower: bursts of streaks from a radiant, one every ~2-5 s, with lulls between.
    Rates ease up toward midnight and taper off toward dawn. ~1 in 30 is a slow bright fireball. */
@@ -2683,28 +2695,32 @@ function skyTick(dt){
   simH=tmode===1?(simH+dt*.2)%24:tmode===2?simH:clockH();
   const phi=(simH-6)/12*Math.PI;sdir.set(Math.cos(phi),Math.sin(phi)*.85,Math.sin(phi)*.5).normalize();/* east = +x (sunrise over the east sea), west = -x (sunset over the west coast), south = +z */
   const ey=sdir.y,s=clamp((ey+.12)/.27,0,1);nt=1-s*s*(3-2*s);
-  const dusk=clamp(1-Math.abs(ey)/.22,0,1);
+  const dusk=clamp(1-Math.abs(ey)/.22,0,1),duskW=sstep(.34,.05,ey)*sstep(-.22,-.08,ey);   // duskW: a full sunset (or sunrise) from the sun being ~20° up to just below the horizon
   palette(ey);
   domeU.uTop.value.copy(cTop);domeU.uHor.value.copy(cHor);domeU.uBot.value.copy(cHor).multiplyScalar(.75);domeU.uSun.value.copy(sdir);
-  domeU.uGlow.value.copy(SUNO).lerp(SUNW,clamp(ey/.4,0,1)).multiplyScalar(sstep(-.12,.05,ey)*(1.1-.6*clamp(ey/.5,0,1)));
-  W.fog.color.copy(cHor).lerp(cTop,.15);
-  hemi.color.copy(cTop).lerp(SUNW,.55).multiplyScalar(1);hemi.groundColor.copy(HGND).multiplyScalar(1-nt*.7);hemi.intensity=lerp(1.55,.55,nt);
+  domeU.uGlow.value.copy(SUNR).lerp(SUNO,sstep(0,.1,ey)).lerp(SUNW,sstep(.1,.5,ey)).multiplyScalar(sstep(-.12,.05,ey)*(1.1-.6*clamp(ey/.5,0,1)));domeU.uDusk.value=duskW;
+  W.fog.color.copy(cHor).lerp(cTop,.15).lerp(FOGD,duskW*.45);   // (haze is the same all round, so it takes a softer rose rather than the sun's side's red)
+  hemi.color.copy(cTop).lerp(SUNW,.55).lerp(SUNO,duskW*.35);hemi.groundColor.copy(HGND).multiplyScalar(1-nt*.7);hemi.intensity=lerp(1.55,.55,nt);
   // key light: the sun by day, the moon by night (also casts the shadows)
   const up=ey>=0,y=Math.abs(ey);ldir.copy(sdir);if(!up)ldir.negate();ldir.y=Math.max(ldir.y,.18);ldir.normalize();
   key.intensity=(up?3.0:.55)*sstep(0,.16,y);
-  if(up)key.color.copy(SUNO).lerp(SUNW,sstep(.04,.45,y));else key.color.copy(MOONC);
+  if(up)key.color.copy(SUNR).lerp(SUNO,sstep(0,.12,y)).lerp(SUNW,sstep(.1,.5,y));else key.color.copy(MOONC);
   key.position.set(P.position.x+ldir.x*90,P.position.y+ldir.y*90,P.position.z+ldir.z*90);key.target.position.copy(P.position);
   R.toneMappingExposure=lerp(1.0,1.25,nt);
   // water, clouds
   waterU.uLightDir.value.copy(ldir);waterU.uLightCol.value.copy(key.color).multiplyScalar(up?sstep(0,.1,y):.6*sstep(0,.1,y));waterU.uSkyTop.value.copy(cTop);waterU.uSkyHor.value.copy(cHor);waterU.uLight.value=lerp(1,.22,nt);
-  cloudU.uSun.value.copy(sdir);cloudU.uLit.value.copy(CLOUDW).lerp(CLOUDP,dusk*.7).multiplyScalar(lerp(1.05,.35,nt));cloudU.uShade.value.copy(cTop).lerp(cHor,.5).lerp(CLOUDW,.35).multiplyScalar(lerp(.95,.3,nt));cloudU.uOp.value=.95*(1-sstep(.55,1,nt));
+  cloudU.uSun.value.copy(sdir);cloudU.uLit.value.copy(CLOUDW).lerp(CLOUDP,duskW*.9).multiplyScalar(lerp(1.05,.35,nt));cloudU.uShade.value.copy(cTop).lerp(cHor,.5).lerp(CLOUDW,.35).lerp(CLOUDV,duskW*.4).multiplyScalar(lerp(.95,.3,nt));cloudU.uOp.value=.95*(1-sstep(.55,1,nt));
   // night details
   windowMat.emissiveIntensity=2.4*sstep(.2,.8,nt);bulbMat.emissiveIntensity=.2+3.8*sstep(.2,.8,nt);
   poolTick(sstep(.2,.8,nt));fireMat.uniforms.uNight.value=sstep(.5,1,nt);
   // stars + labels
   starMat.uniforms.op.value=nt;starMat.uniforms.t.value=performance.now()/1000;lineMat.uniforms.op.value=nt*.45;
-  lineObj.visible=lg.visible=cmode==0&&nt>.02;lg.children.forEach(s=>s.material.opacity=nt*.85);skyRot(simH);meteorTick(dt);
-  sdir.multiplyScalar(-1);placeDir(moonG,sdir,1);sdir.multiplyScalar(-1);placeDir(sunG,sdir,1);
+  lineObj.visible=lg.visible=cmode==0&&nt>.02;lg.children.forEach(s=>s.material.opacity=nt*.85);meteorTick(dt);
+  SUNDIR.copy(sdir);MOONDIR.copy(sdir).negate();
+  // the sun reddens and swells as it sinks (a little more of everything near the horizon); both glows die away once they are below it
+  {const t1=sstep(-.02,.06,ey),t2=sstep(.05,.2,ey),t3=sstep(.15,.45,ey),g=sstep(0,.35,ey);SUNDISC.color.copy(SD0).lerp(SD1,t1).lerp(SD2,t2).lerp(SD3,t3);
+    sunG.scale.setScalar(1+.35*(1-sstep(0,.3,ey)));SUNGLOW.material.color.setRGB(1,lerp(.42,1,g),lerp(.2,1,g));SUNGLOW.scale.setScalar(lerp(120,60,sstep(0,.3,ey)));
+    const dp=clamp(cam.position.y/500,0,.4);SUNGLOW.material.opacity=sstep(-.07,.01,ey+dp);MOONGLOW.material.opacity=sstep(-.07,.01,-ey+dp)}
   $('clk').textContent=fmt(simH)+(dayI?' · '+MON[dayI-1]:'')}
 
 /* =========================== AMBIENT SOUND (synthesised, no files) =========================== */
@@ -3320,7 +3336,7 @@ function frame(){
   cam.position.set(cpx-vx*dd,ty-vy*dd,P.position.z-vz*dd);
   const gy=H(cam.position.x,cam.position.z)+.8;if(cam.position.y<gy)cam.position.y=gy;
   cam.lookAt(cam.position.x+vx,cam.position.y+vy,cam.position.z+vz);
-  dome.position.copy(cam.position);
+  dome.position.copy(cam.position);anchorSky();
   MIST.forEach((m,i)=>{const k=(t*.22+(i%5)/5)%1,F=m.userData.F;m.position.set(F.x+Math.sin(i*2.1+t*.3)*1.6,F.y+.4+k*3.2,F.z+Math.cos(i*1.7+t*.25)*1.6);m.scale.setScalar(2.4+k*3.2);m.material.opacity=.42*sstep(0,.2,k)*(1-k)*(1-nt*.6)});
   wheelG.rotation.x+=dt*.6;   // the wheel turns with the water (bottom moving downstream, to the east)
   lhTick(dt);
