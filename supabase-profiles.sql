@@ -14,6 +14,11 @@ alter table public.profiles add constraint profiles_state_small check (pg_column
 
 alter table public.profiles enable row level security;
 
+-- let signed-in people use the table through the API at all. (Newer Supabase projects do not do this for tables made in the SQL editor,
+-- and without it every read fails with "permission denied", so nothing is ever saved. Harmless if it was already granted.)
+grant usage on schema public to authenticated;
+grant select, insert, update on public.profiles to authenticated;
+
 -- each signed-in person can read and write only their own row
 drop policy if exists "profiles: read own"   on public.profiles;
 drop policy if exists "profiles: insert own" on public.profiles;
