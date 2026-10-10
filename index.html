@@ -2441,11 +2441,20 @@ function makeCloudAdapter(cfg,prepare,fallback){
     onChange:f=>listeners.push(f),
     async signIn(){await ready;if(fail)throw new Error('Sign-in is not available right now');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)throw nice(error)},
     async signOut(){await ready;if(sb)await sb.auth.signOut({scope:'local'})}};
+  /* Realtime lets one client send only 5 presence updates (track / untrack) per 30 s and shuts the channel down on the 6th, so every presence update goes through here.
+     We keep to 4; when they are used up, the newest state per channel waits for room (nothing is lost, only delayed). Positions go by broadcast and have no such limit. */
+  const PR={t:[],wait:new Map(),timer:0,MAX:4,WIN:30000};
+  const prRoom=()=>{const n=Date.now();while(PR.t.length&&n-PR.t[0]>PR.WIN)PR.t.shift();return PR.t.length<PR.MAX};
+  const prDelay=()=>Math.max(250,(PR.t[0]||Date.now())+PR.WIN-Date.now()+50);
+  const prSend=(c,st)=>{PR.t.push(Date.now());try{Promise.resolve(c.track(st)).catch(()=>{})}catch(_){}};
+  const prFlush=()=>{PR.timer=0;for(const[c,st]of[...PR.wait]){if(!prRoom())break;PR.wait.delete(c);prSend(c,st)}if(PR.wait.size)PR.timer=setTimeout(prFlush,prDelay())};
+  const ptrack=(c,st)=>{if(!c)return;if(PR.wait.has(c)||!prRoom()){PR.wait.set(c,st);if(!PR.timer)PR.timer=setTimeout(prFlush,prDelay());return}prSend(c,st)};
+  const pstat=()=>{prRoom();return{used:PR.t.length,max:PR.MAX,waiting:PR.wait.size}};
   /* one session per account: a presence channel per user. The first tab/device is active; a later one waits (pending) until confirmed, then tells the active one to sign out. */
   const sid=uid();let sch=null,sstate='off',sjoined=0,sdec=false,starting=false;const sls=[];
   const sset=s=>{if(s!==sstate){sstate=s;sls.forEach(f=>{try{f(s)}catch(_){}})}};
-  const sdrop=async()=>{const c=sch;sch=null;sdec=false;if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}};
-  const sactivate=()=>{sset('active');try{sch&&sch.track({t:sjoined,a:true})}catch(_){}};
+  const sdrop=async()=>{const c=sch;sch=null;sdec=false;PR.wait.delete(c);if(c&&sb){try{await sb.removeChannel(c)}catch(_){}}};
+  const sactivate=()=>{sset('active');ptrack(sch,{t:sjoined,a:true})};
   const sdecide=()=>{if(!sch||!sdec||(sstate!=='check'&&sstate!=='pending'))return;
     const o=Object.entries(sch.presenceState()).filter(([k])=>k!==sid).map(([k,v])=>{const e=v[v.length-1]||{};return{k,t:+e.t||0,a:!!e.a}});
     if(o.some(e=>e.a))sset('pending');
@@ -2458,7 +2467,7 @@ function makeCloudAdapter(cfg,prepare,fallback){
       const c=sb.channel(cfg.room+'-session-'+user.id,{config:{broadcast:{self:false,ack:true},presence:{key:sid}}});sch=c;starting=false;sjoined=Date.now();let subbed=false;
       c.on('broadcast',{event:'takeover'},m=>{const p=m&&m.payload;if(sstate==='active'&&p&&p.to&&p.to!==sid)skicked()});
       c.on('presence',{event:'sync'},sdecide);
-      c.subscribe(st=>{if(st==='SUBSCRIBED'){subbed=true;c.track({t:sjoined,a:false});setTimeout(()=>{if(sch===c){sdec=true;sdecide()}},1000)}});
+      c.subscribe(st=>{if(st==='SUBSCRIBED'){subbed=true;ptrack(c,{t:sjoined,a:false});setTimeout(()=>{if(sch===c){sdec=true;sdecide()}},1000)}});
       setTimeout(()=>{if(sch===c&&!subbed&&sstate==='check')sactivate()},9000)},   // realtime unreachable: don't lock the person out
     async stop(){if(sstate!=='kicked'&&sstate!=='declined')sset('off');await sdrop()},
     async takeOver(){if(!sch||sstate!=='pending')return;
@@ -2473,24 +2482,24 @@ function makeCloudAdapter(cfg,prepare,fallback){
       ch=sb.channel(cfg.room,{config:{broadcast:{self:false,ack:true},presence:{key:me}}});
       ch.on('broadcast',{event:'chat'},m=>rh.chat.forEach(f=>f({isMe:false,sameTab:false,data:m&&m.payload})));
       ch.on('presence',{event:'join'},e=>{if(!rlive||!e||e.key===me)return;const n=e.newPresences&&e.newPresences[0]&&e.newPresences[0].n;rh.join.forEach(f=>f(n))});
-      ch.subscribe(st=>{rok=st==='SUBSCRIBED';if(rok){ch.track({n:who()});setTimeout(()=>{rlive=true},1500)}else if(st==='CLOSED'||st==='CHANNEL_ERROR'||st==='TIMED_OUT')rlive=false});
+      ch.subscribe(st=>{rok=st==='SUBSCRIBED';if(rok){ptrack(ch,{n:who()});setTimeout(()=>{rlive=true},1500)}else if(st==='CLOSED'||st==='CHANNEL_ERROR'||st==='TIMED_OUT')rlive=false});
       return true},
-    async close(){const c=ch;ch=null;rok=rlive=false;if(c&&sb){const p=(async()=>{try{await sb.removeChannel(c)}catch(_){}})();rclosing=p;await p;if(rclosing===p)rclosing=null}}};
+    async close(){const c=ch;ch=null;rok=rlive=false;PR.wait.delete(c);if(c&&sb){const p=(async()=>{try{await sb.removeChannel(c)}catch(_){}})();rclosing=p;await p;if(rclosing===p)rclosing=null}}};
   /* the shared world: a second Realtime channel. Broadcast 'p' carries positions (not acknowledged, nothing stored); presence carries who is on which bike / seat. */
   // (wclosing: a close still in flight; re-opening the same topic before it ends lets the old leave kill the new channel)
   let wch=null,wkey='',wok=false,wclosing=null;const wh={};const wfire=(t,a)=>(wh[t]||[]).forEach(f=>{try{f(a)}catch(_){}});
   const world={connected:()=>wok,key:()=>wkey,on:(t,f)=>{(wh[t]||(wh[t]=[])).push(f)},
     send(t,data){if(wch&&wok){try{Promise.resolve(wch.send({type:'broadcast',event:t,payload:data})).catch(()=>{})}catch(_){}}},
-    track(st){if(wch&&wok){try{Promise.resolve(wch.track(st)).catch(()=>{})}catch(_){}}},
+    track(st){if(wch&&wok)ptrack(wch,st)},presence:pstat,
     state(){try{return wch&&wok?wch.presenceState():{}}catch(_){return{}}},
     async open(){await ready;if(wclosing)await wclosing;if(fail||!sb||!user||wch)return !!wch;wkey=user.id+':'+Math.random().toString(36).slice(2,7);   // (a second tab of yours is a second character)
-      wch=sb.channel(cfg.room+'-world',{config:{broadcast:{self:false,ack:false},presence:{key:wkey}}});
+      const me=wch=sb.channel(cfg.room+'-world',{config:{broadcast:{self:false,ack:false},presence:{key:wkey}}});
       wch.on('broadcast',{event:'p'},m=>wfire('p',m&&m.payload));
       wch.on('presence',{event:'sync'},()=>wfire('sync',wch?wch.presenceState():{}));
       wch.on('presence',{event:'join'},e=>{if(e&&e.key!==wkey)wfire('join',e.key)});
-      wch.subscribe(st=>{const ok=st==='SUBSCRIBED';if(ok!==wok){wok=ok;wfire('status',ok)}});
+      wch.subscribe(st=>{if(me!==wch)return;const ok=st==='SUBSCRIBED';if(ok!==wok){wok=ok;wfire('status',ok)}if(!ok)wfire('down',st)});
       return true},
-    async close(){const c=wch;wch=null;if(wok){wok=false;wfire('status',false)}if(c&&sb){const p=(async()=>{try{await sb.removeChannel(c)}catch(_){}})();wclosing=p;await p;if(wclosing===p)wclosing=null}}};
+    async close(){const c=wch;wch=null;PR.wait.delete(c);if(wok){wok=false;wfire('status',false)}if(c&&sb){const p=(async()=>{try{await sb.removeChannel(c)}catch(_){}})();wclosing=p;await p;if(wclosing===p)wclosing=null}}};
   /* the account's saved state (one row, one small JSON document: look, names, the friend, where you stand; see supabase-profiles.sql).
      load(): the state, null if there is none yet, undefined if it can't be read. save(): 'ok', 'retry' (network), or 'off' (no table / not allowed: stop trying). */
   const profile={async load(){await ready;if(fail||!sb||!user)return undefined;const{data,error}=await sb.from(cfg.profiles).select('state').eq('user_id',user.id).maybeSingle();if(error){console.warn('[profile] could not read your saved state (nothing will be saved until this is fixed):',error.message||error);return undefined}return data?data.state:null},
@@ -3325,7 +3334,7 @@ const MP=(()=>{
 const WS=storage.world,none={key:()=>'',say(){},tick(){},tags(){},each(){},bike(){},dbg:()=>null};
 if(!WS||!storage.auth)return none;
 const MAXR=24,remotes=new Map(),pool=[],tagBox=tagN.parentNode,before=(a,ka,b,kb)=>a<b||(a===b&&ka<kb);
-const my={b:-1,bt:0,s:null,st:0,pk:{}};const tp={x:0,z:0},drops={bad:0,last:''};   // tp: where my last presence update said I was; drops: position messages we could not use
+const my={b:-1,bt:0,s:null,st:0,pk:{}};const drops={bad:0,last:''},rc={n:0,t:0,last:''};   // drops: position messages we could not use; rc: times we had to bring the world channel back
 let myKey='',on=false,lastHeal=0,acc=0,lastSend=0,lastTrack=0,trackDue=false,dueMin=500,lastSig='',lp={x:P.position.x,z:P.position.z},sent={m:-1,r:0};
 PARKED.forEach(b=>{if(!b.home)b.home={x:b.g.position.x,y:b.g.position.y,z:b.g.position.z,ry:b.g.rotation.y}});   // where each bike lives at the rack
 const num=(v,lo,hi)=>{v=+v;return isFinite(v)&&v>=lo&&v<=hi?v:null};
@@ -3344,8 +3353,8 @@ function onSync(st){const seen=new Set();
   for(const k in st){if(k===myKey)continue;const arr=st[k],e=arr&&arr[arr.length-1];if(!e||typeof e!=='object')continue;
     const R=remotes.get(k)||addRemote(k);if(!R)continue;seen.add(k);if(!R.has&&early.has(k)){applyPos(R,early.get(k));early.delete(k)}
     R.nm=clean(e.n).slice(0,16)||'Someone';
-    // the presence entry carries their last known spot: enough to show them at once, and a fallback if their live position messages stop arriving
-    if(Number.isFinite(e.x)&&Number.isFinite(e.z)&&(!R.has||performance.now()-R.lastP>8000))applyPos(R,{x:e.x,z:e.z,r:e.r||0,m:0});
+    // the presence entry carries the spot they were at when they last joined or changed something: enough to show a newcomer at once (their live positions then take over)
+    if(Number.isFinite(e.x)&&Number.isFinite(e.z)&&!R.has)applyPos(R,{x:e.x,z:e.z,r:e.r||0,m:0});
     setTag(R.tag,clean(e.n).slice(0,16)||'Someone',(e.u|0)>0&&(e.u|0)<STATUS.length?e.u|0:0);   // (anything unknown counts as active)
     const lk=unpackLook(e.a,e.o),sg=packLook(lk).join();if(sg!==R.lk){R.lk=sg;dress(R.rig,lk)}
     R.b=Number.isInteger(e.b)&&e.b>=0&&e.b<PARKED.length?e.b:-1;R.bt=+e.bt||0;
@@ -3380,9 +3389,10 @@ function bikeChanged(){const now=Date.now();
 
 /* ---- telling the others about me ---- */
 const seatNow=()=>!sitting?null:sitting.kind==='ground'&&!SEATS.includes(sitting)?-1:SEATS.indexOf(sitting);
+const mySig=()=>{const p=PPL[ctl];return clean(p.name)+'|'+packLook(p).join()+'|'+MYST+'|'+my.s+'|'+my.b};
 function pushState(force){const now=performance.now();if(!on)return;
   const gap=force?120:500;if(now-lastTrack<gap){dueMin=trackDue?Math.min(dueMin,gap):gap;trackDue=true;return}
-  lastTrack=now;trackDue=false;dueMin=500;tp.x=P.position.x;tp.z=P.position.z;const p=PPL[ctl];
+  lastTrack=now;trackDue=false;dueMin=500;const p=PPL[ctl];
   WS.track({n:clean(p.name).slice(0,16)||'Someone',a:packLook(p),u:MYST,x:+P.position.x.toFixed(1),z:+P.position.z.toFixed(1),r:+wrapA(P.rotation.y).toFixed(2),b:my.b,bt:my.bt,s:my.s,st:my.st,pk:my.pk})}
 function sendPos(force,mv){const now=performance.now();lastSend=now;sent.m=mv;sent.r=P.rotation.y;
   WS.send('p',{k:myKey,x:+P.position.x.toFixed(2),z:+P.position.z.toFixed(2),r:+wrapA(P.rotation.y).toFixed(2),m:mv})}
@@ -3403,8 +3413,12 @@ WS.on('sync',onSync);
 WS.on('join',()=>{if(on)sendPos(true,sent.m<0?0:sent.m);[600,1800].forEach(ms=>setTimeout(()=>{if(on)sendPos(true,sent.m<0?0:sent.m)},ms))});
 WS.on('status',ok=>{
   console.info('[world] '+(ok?'connected':'disconnected'));
-  if(ok){myKey=WS.key();on=true;my.s=seatNow();my.st=my.st||Date.now();lastSig='';pushState(true);sendPos(true,0);[700,1800].forEach(ms=>setTimeout(()=>{if(on)sendPos(true,sent.m<0?0:sent.m)},ms))}
-  else{on=false;remotes.forEach(dropRemote);reconcile()}});
+  if(ok){myKey=WS.key();on=true;my.s=seatNow();my.st=my.st||Date.now();lastSig=mySig();pushState(true);sendPos(true,0);[700,1800].forEach(ms=>setTimeout(()=>{if(on)sendPos(true,sent.m<0?0:sent.m)},ms))}
+  else{on=false;remotes.forEach(dropRemote);reconcile()}
+  if(ok)rc.t=0});
+// the channel can be closed on us (too many presence updates, a dropped network ...) and it does not always come back by itself: bring it back, politely (2 s, 4 s, 8 s ... at most 30 s apart)
+let retryT=0;
+WS.on('down',why=>{if(retryT)return;rc.last=String(why);retryT=setTimeout(async()=>{retryT=0;if(WS.connected()||!storage.auth.user()||!storage.session.active())return;rc.n++;rc.t++;try{await WS.close();await WS.open()}catch(_){}},Math.min(30000,2000*2**Math.min(rc.t,4)))});
 const sync=async()=>{if(storage.auth.user()&&storage.session.active()){try{await WS.open()}catch(_){}}else{try{await WS.close()}catch(_){}}};
 storage.ready.then(sync);storage.auth.onChange(()=>{sync()});storage.session.onChange(()=>{sync()});
 
@@ -3413,11 +3427,10 @@ const sOf=R=>R.s!=null?(R.s>=0?SEATS[R.s]:{kind:'ground'}):null;
 function tick(dt,t){
   if(on){
     const sn=seatNow();if(sn!==my.s){my.s=sn;my.st=Date.now()}
-    const p=PPL[ctl],sig=clean(p.name)+'|'+packLook(p).join()+'|'+MYST+'|'+my.s+'|'+my.b;
+    const sig=mySig();
     if(sig!==lastSig){lastSig=sig;pushState(false)}else if(trackDue&&performance.now()-lastTrack>=dueMin)pushState(true);
     acc+=dt;if(acc>=.25){const d=acc;acc=0;const x=P.position.x,z=P.position.z,v=Math.hypot(x-lp.x,z-lp.z)/d;lp.x=x;lp.z=z;const mv=v>.8?1:0;
       if(mv||mv!==sent.m||Math.abs(wrapA(P.rotation.y-sent.r))>.05||performance.now()-lastSend>(remotes.size?4000:20000))sendPos(false,mv)}   // standing still: a small 'still here' every 4 s with company (so nobody stays invisible for long), every 20 s alone
-    if(performance.now()-lastTrack>5000&&Math.hypot(P.position.x-tp.x,P.position.z-tp.z)>1.5)pushState(false);
     // heal a missed update: if the list of who is here (from the server) disagrees with who we are showing, take the server's list
     if(performance.now()-lastHeal>3000){lastHeal=performance.now();const st=WS.state(),n=Math.min(MAXR,Object.keys(st).filter(k=>k!==myKey).length);if(n!==remotes.size)onSync(st)}}
   const now=performance.now();
@@ -3439,7 +3452,7 @@ function tags(){remotes.forEach(R=>{const q=R.rig.root.position;
   if(R.has&&!open)tagAt(R.tag,q.x,q.y,q.z,8,70);else R.tag.style.display='none';
   if(R.has&&!open&&R.sayUntil>performance.now())tagAt(R.say,q.x,q.y+4.4,q.z,-8,70,true);else if(R.say.style.display!=='none')R.say.style.display='none'})}
 function dbg(){const o=Object.entries(WS.state()).filter(([k])=>k!==myKey),now=performance.now();
-  return{conn:WS.connected(),listed:o.length,shown:remotes.size,withPos:[...remotes.values()].filter(R=>R.has).length,drops:{...drops},peers:[...remotes.values()].map(R=>(R.nm||'?')+(R.has?' '+((now-R.lastP)/1000).toFixed(1)+'s ago':' (no position yet)'))}}
+  return{conn:WS.connected(),pres:WS.presence?WS.presence():null,rc:{...rc},listed:o.length,shown:remotes.size,withPos:[...remotes.values()].filter(R=>R.has).length,drops:{...drops},peers:[...remotes.values()].map(R=>(R.nm||'?')+(R.has?' '+((now-R.lastP)/1000).toFixed(1)+'s ago':' (no position yet)'))}}
 return{dbg,key:()=>myKey,say(k,text){const R=remotes.get(k);if(R){rich(R.say,text);R.sayUntil=performance.now()+4500}},tick,tags,each:f=>remotes.forEach(R=>{if(R.has)f(R)}),bike:bikeChanged}})();
 /*MP-END*/
 // add ?debug to the address to see what the connection is doing (handy when "I can't see anyone" needs a real reason)
@@ -3447,7 +3460,7 @@ if(storage.session)storage.session.onChange(st=>console.info('[session]',st));
 if(/[?&]debug\b/.test(location.search)){const d=document.createElement('pre');d.style.cssText="position:fixed;left:8px;top:96px;z-index:60;margin:0;padding:6px 9px;background:rgba(20,18,30,.8);color:#d6ffe8;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;border-radius:8px;pointer-events:none;max-width:78vw;white-space:pre-wrap";document.body.appendChild(d);
   setInterval(()=>{const g=MP.dbg(),S=storage.session,A=storage.auth&&storage.auth.user();
     d.textContent=['signed in: '+(A?'yes':'no (guest)'),'session: '+(S?S.state():'n/a'),'world: '+(g?(g.conn?'connected':'NOT connected'):'n/a'),
-      g?'server lists '+g.listed+' other(s); showing '+g.shown+' ('+g.withPos+' with a position)':'',...(g?g.peers.map(x=>'   '+x):[]),
+      g&&g.pres?'presence updates in the last 30 s: '+g.pres.used+' of '+g.pres.max+' allowed'+(g.pres.waiting?', '+g.pres.waiting+' waiting':'')+'; times brought back: '+g.rc.n+(g.rc.last?' (last: '+g.rc.last+')':''):'',g?'server lists '+g.listed+' other(s); showing '+g.shown+' ('+g.withPos+' with a position)':'',...(g?g.peers.map(x=>'   '+x):[]),
       g&&g.drops.bad?'unusable position messages: '+g.drops.bad+' e.g. '+g.drops.last:'','my heading: '+P.rotation.y.toFixed(2)+' rad','saved state: '+PST].filter(Boolean).join('\n')},1000)}
 
 const clockT=new THREE.Clock();let t=0,walkPh=0,walkAmt=0,frames=0,lift=0,lastStep=0;
