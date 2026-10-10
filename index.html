@@ -2368,13 +2368,13 @@ function show(s){cur=s;open=true;clearInput();$('t').textContent=s.emoji+' '+s.n
   pick(0);$('panel').style.display='flex';$('x').focus();hydrate(s)}
 function hide(){if(!open)return;open=false;$('panel').style.display='none';const v=document.querySelector('#media video');if(v)v.pause();cv.focus()}
 $('pv').onclick=()=>cur&&pick(ci-1);$('nx').onclick=()=>cur&&pick(ci+1);$('mx').onclick=()=>{const b=$('card').classList.toggle('big');$('mx').textContent=b?'⤡':'⤢'};
-// swipe left or right on the photo to go to the next or previous one (touch and pen; the buttons and a video's own controls are left alone)
+// swipe left or right on the photo: right goes to the next one, left to the previous one (touch and pen; the buttons and a video's own controls are left alone)
 {const vw=$('viewer');let sid=null,sx=0,sy=0,st=0;
   vw.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'||e.target.closest('button'))return;
     if(e.target.tagName==='VIDEO'){const r=e.target.getBoundingClientRect();if(e.clientY>r.bottom-56)return}   // (scrubbing a video's timeline is not a swipe)
     sid=e.pointerId;sx=e.clientX;sy=e.clientY;st=performance.now()});
   vw.addEventListener('pointerup',e=>{if(e.pointerId!==sid)return;sid=null;const dx=e.clientX-sx,dy=e.clientY-sy;
-    if(cur&&cur.items.length>1&&Math.abs(dx)>=45&&Math.abs(dx)>Math.abs(dy)*1.5&&performance.now()-st<900)pick(ci+(dx<0?1:-1))});
+    if(cur&&cur.items.length>1&&Math.abs(dx)>=45&&Math.abs(dx)>Math.abs(dy)*1.5&&performance.now()-st<900)pick(ci+(dx<0?-1:1))});
   vw.addEventListener('pointercancel',()=>{sid=null})}
 $('x').onclick=hide;pr.onclick=()=>{if(near)show(near);else if(sitting||(!riding&&!atRack()&&nearSeat()))sitToggle();else if(!riding&&!atRack()&&dogNear())petDog();else toggleBike()};
 $('panel').addEventListener('pointerdown',e=>{if(e.target.id==='panel')hide()});
